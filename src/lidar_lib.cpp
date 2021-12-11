@@ -7,5 +7,15 @@ using namespace sw::redis;
 
 void publish_lidar_sample(sw::redis::Redis* redis, Lidar* soyBoy)
 {
-    redis->publish("brute_lidar", "lidar");
+    std::string sample_string = "";
+    for(Lidar_data point : soyBoy->sample)
+    {
+        sample_string += std::to_string(point.angle) + "," + std::to_string(point.value) + ",";
+    }
+    redis->publish("raw_data_lidar", sample_string);
+}
+
+void recover_raw_lidar_data(std::string raw_lidar_data)
+{
+    
 }

@@ -150,7 +150,7 @@ int main()
                     }
                 }
             }
-            publish_lidar_sample(&redis);
+            publish_lidar_sample(&redis, &soyBoy);
         } 
         else 
         {
@@ -158,4 +158,6 @@ int main()
             fflush(stderr);
         }
     }
+
+    return 0;
 }

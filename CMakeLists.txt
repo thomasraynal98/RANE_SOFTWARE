@@ -51,13 +51,23 @@ TARGET_LINK_LIBRARIES(prog_data_manager
 
 
 ADD_EXECUTABLE(prog_lidar
-software/prog_lidar.cpp
-src/lidar_lib.cpp 
-include/lidar_lib.h)
+    software/prog_lidar.cpp
+    src/lidar_lib.cpp 
+    include/lidar_lib.h)
 
 TARGET_LINK_LIBRARIES(prog_lidar
     redis++
     pthread
     hiredis
-    ${OpenCV_LIBS}
     ${YDLIDAR_SDK_LIBRARIES})
+
+ADD_EXECUTABLE(prog_com_microcontroler
+    software/prog_com_microcontroler.cpp
+    src/com_micro_lib.cpp 
+    include/com_micro_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_com_microcontroler
+    redis++
+    pthread
+    hiredis
+    /usr/local/lib/libserial.so)

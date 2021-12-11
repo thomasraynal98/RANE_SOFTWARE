@@ -45,4 +45,6 @@ int main()
     {
         sub.consume();
     }
+
+    return 0;
 }

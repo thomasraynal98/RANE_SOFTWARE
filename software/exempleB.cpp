@@ -10,7 +10,6 @@ void print_message(std::string channel, std::string msg) {
 
 int main()
 {
-    std::string reception = "";
     auto redis = Redis("tcp://127.0.0.1:6379");
 
     // Create a Subscriber.

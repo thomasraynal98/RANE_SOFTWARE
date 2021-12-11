@@ -21,4 +21,5 @@ struct Lidar
     std::vector<Lidar_data> sample;
 };
 
-void publish_lidar_sample(sw::redis::Redis* redis);
+void publish_lidar_sample(sw::redis::Redis* redis, Lidar* lidar);
+void recover_raw_lidar_data(std::string raw_lidar_data);
