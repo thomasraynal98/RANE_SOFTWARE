@@ -3,9 +3,18 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/core/utility.hpp>
 #include <sw/redis++/redis++.h>
 
 #include "manager_lib.h"
+
+void init_variable_REDIS(sw::redis::Redis* redis)
+{
+    redis->set("Param_link_current_map_session", "");
+    redis->set("Param_link_current_map_png", "");
+    redis->set("State_map_validate", "false");
+    redis->set("State_map_available", "false");
+} 
 
 bool read_ID_file_and_push(sw::redis::Redis* redis)
 {
@@ -66,6 +75,9 @@ bool read_PARAM_file_and_push(sw::redis::Redis* redis)
 
     fsSettings["Param_unstall_pwm"] >> read_data;
     redis->set("Param_unstall_pwm", read_data);
+
+    fsSettings["Param_server_adress"] >> read_data;
+    redis->set("Param_server_adress", read_data);
 
     fsSettings.release();
 
@@ -134,6 +146,7 @@ bool write_PARAM_file(sw::redis::Redis* redis)
     fsSettings << "Param_back_angle" << *(redis->get("Param_back_angle"));
     fsSettings << "Param_stall_pwm" << *(redis->get("Param_stall_pwm"));
     fsSettings << "Param_unstall_pwm" << *(redis->get("Param_unstall_pwm"));
+    fsSettings << "Param_server_adress" << *(redis->get("Param_server_adress"));
 
     fsSettings.release();
     return true;
@@ -155,4 +168,42 @@ bool write_MAP_file(sw::redis::Redis* redis)
 
     fsSettings.release();
     return true;
+}
+
+void check_map_available(sw::redis::Redis* redis)
+{
+    std::string link_file_1 = "../data_software/map/" + *(redis->get("Param_localisation")) + "_" + *(redis->get("Param_id_current_map")) + ".session";
+    std::string link_file_2 = "../data_software/map/" + *(redis->get("Param_localisation")) + "_" + *(redis->get("Param_id_current_map")) + ".png";
+
+    if(cv::samples::findFile(link_file_1).empty() || cv::samples::findFile(link_file_2).empty())
+    {
+        redis->set("State_map_available", "false");
+    }
+    else
+    {
+        redis->set("State_map_available", "true");
+    }
+}
+
+void download_map_file(sw::redis::Redis* redis)
+{
+    bool error = false;
+
+    /* Try to download new .session and .pnj from server. */
+    std::string wget_session = "wget -P ../data_robot/Navigation/ ";
+    wget_session += *(redis->get("Param_link_current_map_session"));
+    if(system(wget_session.c_str()) != 0){ error = true;}; 
+
+    std::string wget_png = "wget -P ../data_robot/Navigation/ ";
+    wget_png += *(redis->get("Param_link_current_map_png"));
+    if(system(wget_png.c_str()) != 0){ error = true;}; 
+
+    if(error == false)
+    {
+        redis->set("State_map_available", "true");
+    }
+    else
+    {
+        redis->set("State_map_available", "false");
+    }
 }

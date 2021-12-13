@@ -91,7 +91,6 @@ void function_thread_C()
 
             if(reponse.size() > 0)
             {
-                std::cout << "R:" << reponse;
                 if(reponse[0] == '0')
                 {
                     // pong reception.
@@ -108,6 +107,7 @@ void function_thread_C()
                 if(reponse[0] == '2')
                 {
                     // encoder data reception.
+                    publish_raw_data_encoder(&redis, reponse);
                 }
             }
 
@@ -136,7 +136,7 @@ void function_thread_D()
     // THREAD DESCRIPTION: send command to micro.
 
     //
-    int frequency       = 100;
+    int frequency       = 50;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
@@ -163,7 +163,7 @@ int main()
 {
     auto sub = redis.subscriber();
     sub.on_message(callback_command);
-    sub.subscribe("command_motor");
+    sub.subscribe("command_micro");
 
     // detect teensy port.
     connection = found_micro_port(0,true);
@@ -171,7 +171,7 @@ int main()
     // run thread.
     thread_A = std::thread(&function_thread_A);
     thread_B = std::thread(&function_thread_B, &sub);
-    thread_C =  std::thread(&function_thread_C);
+    thread_C = std::thread(&function_thread_C);
     thread_D = std::thread(&function_thread_D);
 
     thread_A.join();

@@ -1,4 +1,5 @@
 #include "com_micro_lib.h"
+#include <sw/redis++/redis++.h>
 #include <iostream>
 #include <libserial/SerialPort.h>
 #include <libserial/SerialStream.h>
@@ -68,5 +69,9 @@ void send_ping_micro(LibSerial::SerialPort* connection, std::chrono::high_resolu
 void send_command_micro(LibSerial::SerialPort* connection, std::string motor_message)
 {
     connection->Write(motor_message);
-    std::cout << "S:" << motor_message;
+}
+
+void publish_raw_data_encoder(sw::redis::Redis* redis, std::string encoder_message)
+{
+    redis->publish("raw_data_encoder", encoder_message);
 }

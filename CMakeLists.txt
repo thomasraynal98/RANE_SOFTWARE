@@ -6,6 +6,9 @@ PROJECT(rane_software VERSION 1.0)
 # include directories.
 INCLUDE_DIRECTORIES(include)
 
+# include Socket IO.
+include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/socket.io-client-cpp/CMakeLists.txt)
+
 # set good gcc version.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,7 +40,7 @@ TARGET_LINK_LIBRARIES(exempleB
     pthread
     hiredis)
 
-# add the executable.
+# PROGRAMME YAML MANAGER.
 ADD_EXECUTABLE(prog_data_manager
     software/prog_data_manager.cpp
     src/manager_lib.cpp 
@@ -49,7 +52,7 @@ TARGET_LINK_LIBRARIES(prog_data_manager
     hiredis
     ${OpenCV_LIBS})
 
-
+# PROGRAMME LIDAR MANAGER.
 ADD_EXECUTABLE(prog_lidar
     software/prog_lidar.cpp
     src/lidar_lib.cpp 
@@ -61,6 +64,7 @@ TARGET_LINK_LIBRARIES(prog_lidar
     hiredis
     ${YDLIDAR_SDK_LIBRARIES})
 
+# PROGRAMME MICROCONTROLER MANAGER.
 ADD_EXECUTABLE(prog_com_microcontroler
     software/prog_com_microcontroler.cpp
     src/com_micro_lib.cpp 
@@ -71,3 +75,15 @@ TARGET_LINK_LIBRARIES(prog_com_microcontroler
     pthread
     hiredis
     /usr/local/lib/libserial.so)
+
+# PROGRAMME COMMUNICATION SERVER.
+ADD_EXECUTABLE(prog_com_server
+software/prog_com_server.cpp
+src/com_server_lib.cpp 
+include/com_server_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_com_server
+    redis++
+    pthread
+    hiredis
+    sioclient)

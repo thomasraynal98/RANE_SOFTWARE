@@ -20,10 +20,18 @@ void callback_command(std::string channel, std::string msg)
         write_PARAM_file(&redis);
         write_MAP_file(&redis);
     }
+    if(msg.compare("download_new_map") == 0)
+    {
+        download_map_file(&redis);
+    }
 }
 
 int main()
 {    
+    // initialisation.
+    init_variable_REDIS(&redis);
+    check_map_available(&redis);
+
     if(!read_ID_file_and_push(&redis))
     {
         // inform REDIS for this error.
