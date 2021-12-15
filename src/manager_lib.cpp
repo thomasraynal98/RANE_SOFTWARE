@@ -79,6 +79,18 @@ bool read_PARAM_file_and_push(sw::redis::Redis* redis)
     fsSettings["Param_server_adress"] >> read_data;
     redis->set("Param_server_adress", read_data);
 
+    fsSettings["Param_distance_btw_kp"] >> read_data;
+    redis->set("Param_distance_btw_kp", read_data);
+
+    fsSettings["Param_3D_to_pixel_A"] >> read_data;
+    redis->set("Param_3D_to_pixel_A", read_data);
+
+    fsSettings["Param_3D_to_pixel_B"] >> read_data;
+    redis->set("Param_3D_to_pixel_B", read_data);
+
+    fsSettings["Param_robot_length"] >> read_data;
+    redis->set("Param_robot_length", read_data);
+
     fsSettings.release();
 
     return true;
@@ -147,6 +159,10 @@ bool write_PARAM_file(sw::redis::Redis* redis)
     fsSettings << "Param_stall_pwm" << *(redis->get("Param_stall_pwm"));
     fsSettings << "Param_unstall_pwm" << *(redis->get("Param_unstall_pwm"));
     fsSettings << "Param_server_adress" << *(redis->get("Param_server_adress"));
+    fsSettings << "Param_distance_btw_kp" << *(redis->get("Param_distance_btw_kp"));
+    fsSettings << "Param_3D_to_pixel_A" << *(redis->get("Param_3D_to_pixel_A"));
+    fsSettings << "Param_3D_to_pixel_B" << *(redis->get("Param_3D_to_pixel_B"));
+    fsSettings << "Param_robot_length" << *(redis->get("Param_robot_length"));
 
     fsSettings.release();
     return true;

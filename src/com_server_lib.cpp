@@ -138,7 +138,7 @@ void check_the_good_map(sw::redis::Redis* redis, sio::socket::ptr current_socket
     sio::message::ptr test = sio::object_message::create();
 
     test->get_map()["localisation"] = sio::string_message::create(*(redis->get("Param_localisation")));
-    test->get_map()["map_id"]       = sio::int_message::create(stoi(*(redis->get("Param_id_current_map"))));
+    test->get_map()["map_id"]       = sio::int_message::create(std::stoi(*(redis->get("Param_id_current_map"))));
     
     current_socket->emit("check_map", test);
 }

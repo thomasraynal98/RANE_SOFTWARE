@@ -14,7 +14,7 @@
 
 void get_param_data(sw::redis::Redis* redis, std::string* adress);
 void init_server_connection(sw::redis::Redis* redis, sio::socket::ptr current_socket);
-void bind_events(sio::socket::ptr current_socket, std::mutex* _lock);
+void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::mutex* _lock);
 void recover_data_and_send_to_server(sio::socket::ptr current_socket);
 void check_the_good_map(sw::redis::Redis* redis, sio::socket::ptr current_socket);
 void active_download_map(sw::redis::Redis* redis);

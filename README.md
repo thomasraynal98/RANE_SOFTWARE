@@ -3,3 +3,6 @@ This repository will store all program for the futur RANE robot from HIVE ROBOTI
 
 # v1.1
 * intégration de redis pour une gestion plus segmenter du programme.
+
+# TODO
+* completer l'integration des encodeurs en envoyant le bon format de donné.

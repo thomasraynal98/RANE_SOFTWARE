@@ -17,6 +17,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -lredis++ -lhiredis 
 # found package.
 FIND_PACKAGE(OpenCV 4 REQUIRED)
 FIND_PACKAGE(ydlidar_sdk REQUIRED)
+FIND_PACKAGE(slamcore_sdk REQUIRED)
 
 include_directories(
   ${YDLIDAR_SDK_INCLUDE_DIRS}
@@ -87,3 +88,16 @@ TARGET_LINK_LIBRARIES(prog_com_server
     pthread
     hiredis
     sioclient)
+
+# PROGRAMME GLOBAL PATH.
+ADD_EXECUTABLE(prog_vslam
+software/prog_vslam.cpp
+src/vslam_lib.cpp 
+include/vslam_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_vslam
+    redis++
+    pthread
+    hiredis
+    slamcore::slamcore
+    ${OpenCV_LIBS})
