@@ -2,6 +2,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <slamcore/slamcore.hpp>
 
 #include "vslam_lib.h"
 

@@ -89,7 +89,7 @@ TARGET_LINK_LIBRARIES(prog_com_server
     hiredis
     sioclient)
 
-# PROGRAMME GLOBAL PATH.
+# PROGRAMME VSLAM.
 ADD_EXECUTABLE(prog_vslam
 software/prog_vslam.cpp
 src/vslam_lib.cpp 
@@ -100,4 +100,28 @@ TARGET_LINK_LIBRARIES(prog_vslam
     pthread
     hiredis
     slamcore::slamcore
+    ${OpenCV_LIBS})
+
+# PROGRAMME GLOBAL PATH.
+ADD_EXECUTABLE(prog_global_path
+software/prog_global_path.cpp
+src/global_path_lib.cpp 
+include/global_path_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_global_path
+    redis++
+    pthread
+    hiredis
+    ${OpenCV_LIBS})
+
+# PROGRAMME LOCAL PATH.
+ADD_EXECUTABLE(prog_local_path
+software/prog_local_path.cpp
+src/local_path_lib.cpp 
+include/local_path_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_local_path
+    redis++
+    pthread
+    hiredis
     ${OpenCV_LIBS})

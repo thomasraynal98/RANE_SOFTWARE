@@ -4,6 +4,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <stack>
+#include <slamcore/slamcore.hpp>
 
 typedef std::pair<int, int> Pair;
 struct cell {
@@ -38,3 +39,4 @@ bool isUnBlocked(cv::Mat grid, const Pair& point);
 std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis* redis);
 Pair get_destination_position(sw::redis::Redis* redis);
 Pair get_current_position(sw::redis::Redis* redis);
+void send_keypoint_global_path(sw::redis::Redis* redis, std::vector<Pair>* keypoint_global_path);
