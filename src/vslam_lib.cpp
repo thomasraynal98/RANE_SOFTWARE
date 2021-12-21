@@ -106,7 +106,7 @@ try
     {   
         /* update translation. */
         std::string message_position;
-        double x, y, z, r, p, yaw, q1, q2, q3, q4;
+        double x, y, z, r, p, yaw, q1, q2, q3, q4, pixel_yaw;
         x                  += poseObj->getTranslation().x();
         y                  += poseObj->getTranslation().y();
         z                  += poseObj->getTranslation().z();
@@ -137,7 +137,7 @@ try
         yaw = std::atan2(siny_cosp, cosy_cosp);
 
         // TODO : please god don't judge me.
-        // cur_pose.pixel.y_pixel = 360 - modulo((int)(yaw*(180/M_PI))+90,360);
+        pixel_yaw = 360 - modulo((int)(yaw*(180/M_PI))+90,360);
 
         message_position += std::to_string(x) + "/" + std::to_string(y) + "/" + std::to_string(z) + "/" + std::to_string(r) + "/" + std::to_string(p) + "/" + std::to_string(yaw) + "/";
         redis->set("State_robot_position", message_position);
@@ -151,7 +151,7 @@ try
         double cam_to_center = std::stod(*(redis->get("Param_robot_length")));
         int center_i = x + sin(M_PI-yaw)*cam_to_center;
         int center_j = y + cos(M_PI-yaw)*cam_to_center;
-        message_position = std::to_string(center_i) + "/" + std::to_string(center_j) + "/";
+        message_position = std::to_string(center_i) + "/" + std::to_string(center_j) + "/" + std::to_string(pixel_yaw) + "/";
         redis->set("State_robot_position_png", message_position);
 
     });

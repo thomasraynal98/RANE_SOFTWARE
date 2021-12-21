@@ -191,13 +191,16 @@ void check_map_available(sw::redis::Redis* redis)
     std::string link_file_1 = "../data_software/map/" + *(redis->get("Param_localisation")) + "_" + *(redis->get("Param_id_current_map")) + ".session";
     std::string link_file_2 = "../data_software/map/" + *(redis->get("Param_localisation")) + "_" + *(redis->get("Param_id_current_map")) + ".png";
 
-    if(cv::samples::findFile(link_file_1).empty() || cv::samples::findFile(link_file_2).empty())
+    try
+    {
+        if(!cv::samples::findFile(link_file_1).empty() || !cv::samples::findFile(link_file_2).empty())
+        {
+            redis->set("State_map_available", "true");
+        }
+    }
+    catch(...)
     {
         redis->set("State_map_available", "false");
-    }
-    else
-    {
-        redis->set("State_map_available", "true");
     }
 }
 

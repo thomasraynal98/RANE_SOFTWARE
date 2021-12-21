@@ -125,3 +125,13 @@ TARGET_LINK_LIBRARIES(prog_local_path
     pthread
     hiredis
     ${OpenCV_LIBS})
+
+# PROGRAMME DEBUG REDIS.
+ADD_EXECUTABLE(prog_debug
+software/prog_debug.cpp)
+
+TARGET_LINK_LIBRARIES(prog_debug
+    redis++
+    pthread
+    hiredis
+    ${OpenCV_LIBS})

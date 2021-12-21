@@ -1,0 +1,66 @@
+#include <sw/redis++/redis++.h>
+#include <iostream>
+#include <thread>
+
+#include <chrono>
+
+using namespace sw::redis;
+auto redis = Redis("tcp://127.0.0.1:6379");
+
+int main()
+{
+    ///TIMER//////////////////////////////////////////////////////////////////////////////////////////////////
+    int frequency       = 2;
+    double time_of_loop = 1000/frequency;                  // en milliseconde.
+    std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
+    auto next = std::chrono::high_resolution_clock::now();
+    ///END////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    while(true)
+    {
+        ///TIMER///////////////////////////////////////////////////////////////////
+        x                          = std::chrono::high_resolution_clock::now();         
+        last_loop_time             = x;
+        next                       += std::chrono::milliseconds((int)time_of_loop);
+        std::this_thread::sleep_until(next);
+        ///END/////////////////////////////////////////////////////////////////////
+        std::system("clear");
+
+        std::cout << "Param_K=" << *redis.get("Param_K") << std::endl;
+        std::cout << "Param_V=" << *redis.get("Param_V") << std::endl;
+        std::cout << "Param_F=" << *redis.get("Param_F") << std::endl;
+        std::cout << "Param_back_angle=" << *redis.get("Param_back_angle") << std::endl;
+        std::cout << "Param_stall_pwm=" << *redis.get("Param_stall_pwm") << std::endl;
+        std::cout << "Param_unstall_pwm=" << *redis.get("Param_unstall_pwm") << std::endl;
+        std::cout << "Param_server_adress=" << *redis.get("Param_server_adress") << std::endl;
+        std::cout << "Param_distance_btw_kp=" << *redis.get("Param_distance_btw_kp") << std::endl;
+        std::cout << "Param_localisation=" << *redis.get("Param_localisation") << std::endl;
+        std::cout << "Param_id_current_map=" << *redis.get("Param_id_current_map") << std::endl;
+        std::cout << "Param_type_current_map=" << *redis.get("Param_type_current_map") << std::endl;
+        std::cout << "Param_saved_map=" << *redis.get("Param_saved_map") << std::endl;
+        std::cout << "Param_modele=" << *redis.get("Param_modele") << std::endl;
+        std::cout << "Param_version=" << *redis.get("Param_version") << std::endl;
+        std::cout << "Param_matricule=" << *redis.get("Param_matricule") << std::endl;
+        std::cout << "Param_exploitation=" << *redis.get("Param_exploitation") << std::endl;
+        std::cout << "Param_link_session=" << *redis.get("Param_link_session") << std::endl;
+        std::cout << "Param_link_png=" << *redis.get("Param_link_png") << std::endl;
+        std::cout << "Param_prenom=" << *redis.get("Param_prenom") << std::endl << std::endl;
+
+        std::cout << "State_slamcore=" << *redis.get("State_slamcore") << std::endl;
+        std::cout << "State_robot_position=" << *redis.get("State_robot_position") << std::endl;
+        std::cout << "State_robot_position_png=" << *redis.get("State_robot_position_png") << std::endl;
+        std::cout << "State_robot_speed=" << *redis.get("State_robot_speed") << std::endl;
+        std::cout << "State_global_path_is_computing=" << *redis.get("State_global_path_is_computing") << std::endl;
+        std::cout << "State_global_path=" << *redis.get("State_global_path") << std::endl;
+        std::cout << "State_is_autonomous=" << *redis.get("State_is_autonomous") << std::endl;
+        std::cout << "State_destination_is_reach=" << *redis.get("State_destination_is_reach") << std::endl;
+        std::cout << "State_position_to_reach=" << *redis.get("State_position_to_reach") << std::endl;
+        std::cout << "State_need_compute_global_path=" << *redis.get("State_need_compute_global_path") << std::endl;
+        std::cout << "State_map_validate=" << *redis.get("State_map_validate") << std::endl;
+        std::cout << "State_map_available=" << *redis.get("State_map_available") << std::endl;
+        std::cout << "State_destination_is_reach=" << *redis.get("State_destination_is_reach") << std::endl << std::endl;
+    }
+
+    return 0;
+}

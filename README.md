@@ -12,3 +12,5 @@ This repository will store all program for the futur RANE robot from HIVE ROBOTI
 * faire le launcher de tout les programmes.
 * quand il reçoit une commande manuel durant une phase d'autonomie, on set up un timer avec "new manuel commande"
 qui va stopper les process automatique durant 1000 ms, sauf une commande special qui va tout arreter.
+* revoir le systeme de selection de target keypoint.
+* set all variable to zero when we start visual slam.

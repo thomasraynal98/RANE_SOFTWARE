@@ -1,4 +1,5 @@
 #include "local_path_lib.h"
+#include <opencv2/imgproc/imgproc.hpp>
 
 std::vector<Pair> format_lidar_data(std::string raw_msg)
 {
@@ -19,12 +20,10 @@ std::vector<Pair> format_lidar_data(std::string raw_msg)
              /* Project brut data into lidar referencial grid. */
             lidar_push.first  = sin(value)*std::stod(T)*40.0/4.0+40.0;
             lidar_push.second = cos(value)*std::stod(T)*40.0/4.0+40.0;
-            std::cout << "value:" << lidar_push.first << " " << lidar_push.second << " et " << -value << " " << T << "\n";
             lidar_data.push_back(lidar_push); 
         }
         i += 1;
     }
-    std::cout << "size:" << lidar_data.size() << "\n";
     return lidar_data;
 }
 
@@ -41,8 +40,26 @@ bool check_process_LCDS(sw::redis::Redis* redis)
     return false;
 }
 
-cv::Mat show_local_environnement(cv::Mat grid, std::vector<Pair> data_lidar)
+cv::Mat show_local_environnement(cv::Mat grid, std::vector<Pair> data_lidar, std::vector<double> current_speed)
 {
+    // add simulation +1000ms.
+    cv::Point pp[1][4];
+    pp[0][0] = cv::Point(36,39);
+    pp[0][1] = cv::Point(42,39);
+
+    pp[0][3] = cv::Point(36+(int)(current_speed[1]*10),39-(int)(current_speed[0]*10));
+    pp[0][2] = cv::Point(42+(int)(current_speed[1]*10),39-(int)(current_speed[0]*10));
+
+    const cv::Point* ppt[1] = { pp[0] };
+
+    int npt[] = { 4 };
+    cv::fillPoly( grid,
+        ppt,
+        npt,
+        1,
+        cv::Scalar( 0, 255, 255 ),
+        0 );
+
     // add lidar data on copy.
     for(auto data : data_lidar)
     {
@@ -53,13 +70,17 @@ cv::Mat show_local_environnement(cv::Mat grid, std::vector<Pair> data_lidar)
         cv::circle(grid, cv::Point((int)(data.first),(int)(data.second)),0, cv::Scalar(255,0,0), cv::FILLED, 0, 0);
     }
 
+
+
     // print robot.
     for(int i = 36; i < 43; i++)
     {cv::circle(grid, cv::Point((int)(i),(int)(39)),0, cv::Scalar(50,50,50), cv::FILLED, 0, 0);}
     cv::circle(grid, cv::Point((int)(39),(int)(39)),0, cv::Scalar(0,0,255), cv::FILLED, 0, 0);
 
+    // show.
     cv::namedWindow("Local_env",cv::WINDOW_AUTOSIZE);
-    cv::resize(grid, grid, cv::Size(0,0),10.0,10.0,6);
+    cv::resize(grid, grid, cv::Size(0,0),18.0,18.0,6);
+    // cv::rotate(grid, grid, 1);
     cv::imshow("Local_env", grid);
 
     char d=(char)cv::waitKey(25);
@@ -67,4 +88,535 @@ cv::Mat show_local_environnement(cv::Mat grid, std::vector<Pair> data_lidar)
     //     break;
 
     return grid;
+}
+
+void get_robot_speed(sw::redis::Redis* redis, std::vector<double>* encoder_data)
+{
+    encoder_data->clear();
+
+    std::string result = *(redis->get("State_robot_speed"));
+
+    std::string T;
+    std::stringstream X(result);
+
+    while(std::getline(X, T, '/'))
+    {
+        encoder_data->push_back(std::stod(T));
+    }
+}
+
+void get_global_path(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_keypoint_path)
+{
+    global_keypoint_path->clear();
+
+    std::string result = *(redis->get("State_global_path"));
+
+    std::string T;
+    std::stringstream X(result);
+
+    // get all point.
+    bool end = false;
+    int coord_i = 0;
+    while(std::getline(X, T, '/'))
+    {
+        if(!end)
+        {
+            coord_i = std::stoi(T);
+        }
+        if(end)
+        {
+            Path_keypoint kp;
+            kp.coordinate.first = coord_i;
+            kp.coordinate.second = std::stoi(T);
+            global_keypoint_path->push_back(kp);
+        }
+        end = !end;
+    }
+
+    // fill in variable. back sens.
+    Pair destination;
+    std::vector<double> current_position = get_current_position_n(redis);
+    for(int i = global_keypoint_path->size()-1; i >= 0; i--)
+    {
+        if(i == global_keypoint_path->size()-1)
+        {
+            // the destination KP.
+            destination.first  = global_keypoint_path->at(i).coordinate.first;
+            destination.second = global_keypoint_path->at(i).coordinate.second;
+            global_keypoint_path->at(i).distance_KPD        = 0;
+            global_keypoint_path->at(i).isTryAvoidArea      = 200;
+            global_keypoint_path->at(i).distance_validation = 0.4; // arbitratry
+
+            // non fix variable.
+            global_keypoint_path->at(i).isReach             = false;
+            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+        }
+        if(i == 0)
+        {
+            // the current position.
+            // fix variable.
+            global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_position)*0.05;
+            // current_keypoint.isTryAvoidArea      = map_weighted.at<uchar>(current_keypoint.coordinate.first, current_keypoint.coordinate.second);
+            global_keypoint_path->at(i).isTryAvoidArea  = 200;
+            global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
+            
+            // non fix variable.
+            global_keypoint_path->at(i).isReach             = true;
+            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+        }
+        if(i != 0 && i != global_keypoint_path->size()-1)
+        {
+            global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_position)*0.05;
+            global_keypoint_path->at(i).isTryAvoidArea      = 200;
+            global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
+
+            // non fix variable.
+            global_keypoint_path->at(i).isReach             = false;
+            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+        }
+    }
+
+    // fill validation angle.
+    for(int i = 0; i < global_keypoint_path->size(); i++)
+    {
+        if(i == 0){global_keypoint_path->at(i).validation_angle = 0;}
+        if(i == global_keypoint_path->size()-1){global_keypoint_path->at(i).validation_angle = 180;}
+        if(i > 0 && i < global_keypoint_path->size()-1) {global_keypoint_path->at(i).validation_angle = compute_validation_angle( global_keypoint_path->at(i-1).coordinate, \
+                                                                                                        global_keypoint_path->at(i).coordinate, \      
+                                                                                                        global_keypoint_path->at(i+1).coordinate);}
+    }
+}
+
+double compute_distance_validation(Path_keypoint kp)
+{
+    /*
+        DESCRIPTION: this function will compute and return the distance of validation.
+            this distance means the minimun distance between robot and focus points
+            to be considered like reach.
+        INFORMATION: this distance take in consideration, the nature of the current 
+            area (try_avoid or not) and the validation angle. 
+        TODO       : take also in consideration the speed in futur.
+        COMPUTE    : the value is between 0.05m in worst case where precision in needed
+            and 0.40m in case that don't necessite precision.
+    */
+
+    double value = 0.10;
+    if(!kp.isTryAvoidArea)          { value += 0.20; }
+    if(kp.validation_angle <= 90/4) { value += 0.15; }
+    return value;
+}
+
+double compute_target_angle(Pair kp, std::vector<double> current_position)
+{
+    /*
+        DESCRIPTION: this function will compute and return the angle between the 
+            current orientation of robot and the angle of pose of robot and pose
+            of path_keypoint pose.
+        COMPUTE    : the value is between 0° deg and 180° deg only > 0.
+    */
+
+    double angle_RKP         = compute_vector_RKP(kp, current_position);
+    double angle_ORIENTATION = current_position[2];
+
+    double distance_deg      = -1;
+    
+    if(angle_RKP >= angle_ORIENTATION)
+    {
+        distance_deg         = angle_RKP - angle_ORIENTATION;
+        if(distance_deg > 180){ distance_deg = 360 - distance_deg;}
+    }
+    else
+    {
+        distance_deg         = angle_ORIENTATION - angle_RKP;
+        if(distance_deg > 180){ distance_deg = 360 - distance_deg;}    
+    }
+
+    return distance_deg;
+}
+
+double compute_distance_RPK(Pair kp, std::vector<double> current_position)
+{
+    /*
+        DESCRIPTION: return the distance between robot en kp.
+    */
+
+    return sqrt(pow((kp.first - current_position[0]), 2.0)
+            + pow((kp.second - current_position[1]), 2.0));
+}
+
+double compute_vector_RKP(const Pair& kp, std::vector<double> current_position)
+{
+    /*
+        DESCRIPTION: compute the angle in world map referenciel of vector 
+            from robot to keypoint. (like North, West, East, South)
+    */
+    
+    double x_sum = kp.first  - current_position[0];
+    double y_sum = kp.second - current_position[1];
+
+    double angle_degree = acos((x_sum)/(sqrt(pow(x_sum, 2.0) + pow(y_sum, 2.0))));
+    if(y_sum < 0)
+    {
+        angle_degree = (M_PI - angle_degree) + M_PI;
+    }
+    return angle_degree * (180/M_PI);
+}
+
+std::vector<double> get_current_position_n(sw::redis::Redis* redis)
+{
+    std::vector<double> current_position;
+
+    std::string result = *(redis->get("State_robot_position_png"));
+
+    std::string T;
+    std::stringstream X(result);
+
+    // get all point.
+    int i = 0;
+    while(std::getline(X, T, '/'))
+    {
+        if(i >= 2)
+        {
+            current_position.push_back(std::stod(T));
+        }
+        i++;
+    }
+
+    return current_position;
+}
+
+double compute_validation_angle(const Pair& kpPrev, const Pair& kpCurrent, const Pair& kpNext)
+{
+    /*
+        DESCRIPTION: this function will compute validation angle, it's an angle form from 3 points,
+            the current one, the previously and the next one.
+    */
+    
+    double angle_RPREV   = compute_vector_RKP_2(kpPrev, kpCurrent);
+    double angle_RNEXT   = compute_vector_RKP_2(kpNext, kpCurrent);
+    double distance_deg  = -1;
+
+    if(angle_RPREV >= angle_RNEXT)
+    {
+        distance_deg         = angle_RPREV - angle_RNEXT;
+        if(distance_deg > 180){ distance_deg = 360 - distance_deg;}
+    }
+    else
+    {
+        distance_deg         = angle_RNEXT - angle_RPREV;
+        if(distance_deg > 180){ distance_deg = 360 - distance_deg;}    
+    }
+
+    return 180 - distance_deg; 
+}
+
+double compute_vector_RKP_2(const Pair& kpCurrent, const Pair& kp2)
+{
+    /*
+        DESCRIPTION: same as version 1 but will take two points in param.
+    */
+
+    double x_sum = kp2.first  - kpCurrent.first;
+    double y_sum = kp2.second - kpCurrent.second;
+
+    double angle_degree = acos((x_sum)/(sqrt(pow(x_sum, 2.0) + pow(y_sum, 2.0))));
+    if(y_sum < 0)
+    {
+        angle_degree = (M_PI - angle_degree) + M_PI;
+    }
+    return angle_degree * (180/M_PI);
+}
+
+void select_target_keypoint(std::vector<Path_keypoint>* global_path_keypoint, Path_keypoint* target_keypoint)
+{
+    /*
+        DESCRIPTION: this fundamentale function will take all state data 
+            en compte for select the better target keypoint between all
+            path_keypoint in keypoints_path vector.
+        HEURISTIC  : there are multiple variable and the heuristic need 
+            to be fine tunned but this is the order of importence for 
+            all variable
+                > 1. (YES) distance_RKP
+                > 2. (YES) target_angle
+                > 3. (YES) isReach  
+                > 4. (YES) distance_KPD
+        PS         : that can be a good feature to integrate the neural 
+            network in this process. Or to integrate a variable that say
+            if there are an object between robot and kp.
+    */
+
+    /* PART 1. Get all pointor from keypoint vector that are in a range
+    of threshold from robot. */
+
+    double threshold = 3.0; //in meter.
+    std::vector<Path_keypoint*> possible_candidate;
+
+    return_nearest_path_keypoint(threshold, global_path_keypoint, &possible_candidate);
+
+    /* PART 2. We need to normalise all variable so first we get the max
+    value of all variable. */
+    double max_distance_RKP = 0;
+    double max_distance_KPD = 0;
+    for(int i = 0; i < possible_candidate.size(); i++)
+    {
+        if(possible_candidate[i]->distance_RKP > max_distance_RKP)
+        {
+            max_distance_RKP = possible_candidate[i]->distance_RKP;
+        }
+        if(possible_candidate[i]->distance_KPD > max_distance_KPD)
+        {
+            max_distance_KPD = possible_candidate[i]->distance_KPD;
+        }
+    }
+
+    /* PART 3. Compute the target keypoint score of all this data. */
+    std::vector<double> score_possible_candidate;
+
+    double weight_distance_RKP = 0.3;
+    double weight_target_angle = 0.7;
+    double weight_distance_KPD = 0.6;
+    double weight_isReach      = -0.4;
+
+    for(int i = 0; i < possible_candidate.size(); i++)
+    {
+        double candidate_note    = 0;
+        double note_distance_RKP = 1 - (possible_candidate[i]->distance_RKP/max_distance_RKP);
+        double note_target_angle = 1 - (possible_candidate[i]->target_angle/180);
+        double note_distance_KPD = 1 - (possible_candidate[i]->distance_RKP/max_distance_KPD);
+
+        candidate_note = weight_distance_RKP*note_distance_RKP + weight_target_angle*note_target_angle + weight_distance_KPD*note_distance_KPD;
+        candidate_note += weight_isReach*possible_candidate[i]->isReach;
+
+        score_possible_candidate.push_back(candidate_note);
+    }
+
+    /* PART 4. Select the better one. */
+    double max_note = 0;
+    int index_candidate = 0;
+    for(int i = 0; i < score_possible_candidate.size(); i++)
+    {
+        if(max_note < score_possible_candidate[i])
+        {   
+            max_note = score_possible_candidate[i];
+            index_candidate = i;
+        }
+    }
+
+    /* PART 5. Init the current target_keypoint. */
+    target_keypoint->coordinate.first  = possible_candidate[index_candidate]->coordinate.first;
+    target_keypoint->coordinate.second = possible_candidate[index_candidate]->coordinate.second;
+}
+
+void return_nearest_path_keypoint(double threshold, std::vector<Path_keypoint>* global_path_keypoint, std::vector<Path_keypoint*>* possible_candidate_target_keypoint)
+{
+    /*
+        DESCRIPTION: this function will run the keypoints_path vector
+            and send back the pointer of keypoints in a distance of less
+            then "threshold". If they are no point less far than the 
+            threshold, we send back the pointer of the less far of all.
+    */
+
+    /* clean this vector. */
+    possible_candidate_target_keypoint->clear();
+
+    /* save the nearest kp in case of no kp is in threshold to avoid bug. */
+    bool isEmpty               = true;
+    Path_keypoint* nearest_kp  = NULL;
+    double distance_nearest_kp = 9999;
+
+    for(int i = 0; i < global_path_keypoint->size(); i++)
+    {
+        if(global_path_keypoint->at(i).distance_RKP < threshold) 
+        { 
+            isEmpty = false;
+            possible_candidate_target_keypoint->push_back(&global_path_keypoint->at(i));
+        }
+        else
+        {
+            if(global_path_keypoint->at(i).distance_RKP < distance_nearest_kp)
+            {
+                /* this one is the nearest outside threshold. */
+                nearest_kp          = &global_path_keypoint->at(i);
+                distance_nearest_kp = global_path_keypoint->at(i).distance_RKP;
+            }
+        }
+    }
+
+    if(isEmpty)
+    {
+        possible_candidate_target_keypoint->push_back(nearest_kp);
+    }
+}
+
+bool destination_reach(Path_keypoint* destination, std::vector<double> current_position)
+{
+    if(compute_distance_RPK(destination->coordinate, current_position)*0.05 <= 0.5)
+    {
+        return true;
+    }
+    return false;
+}
+
+void update_data(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position)
+{
+    // update current_position
+    *current_position = get_current_position_n(redis);
+
+    // update global information.
+    for(auto kp : *global_keypoint)
+    {
+        kp.distance_RKP = compute_distance_RPK(kp.coordinate, *current_position)*0.05;
+        kp.target_angle = compute_target_angle(kp.coordinate, *current_position);
+    }
+}
+
+std::vector<Pair> project_keypoint_in_lidar_referencial(std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position, Path_keypoint* TKP)
+{
+    /* DESCRIPTION:
+        this function will take target keypoint in 6 meters range and project then in lidar
+        referencial.
+    */
+
+    /* Get keypoint in selection range. */
+    double kp_selection_range = 5.0; //m
+    std::vector<Path_keypoint*> keypoints_list_for_projection;
+
+    for(int i = 0; i < global_keypoint->size(); i++)
+    {
+        if(global_keypoint->at(i).distance_RKP <= kp_selection_range)
+        {
+            keypoints_list_for_projection.push_back(&global_keypoint->at(i));
+        }
+    }
+
+    /* Project them in lidar referencial. The target KP to. */
+    /* We need to change referencial angle. */
+    return transform_angle_in_lidar_ref(keypoints_list_for_projection, current_position, TKP);
+}
+
+std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypoints_list_for_projection, std::vector<double>* position, Path_keypoint* TKP)
+{
+    /* DESCRIPTION:
+        this function will take a list of keypoint to project and transform the angle to be 
+        project into the lidar ref grid.
+    */
+
+    /* need this 2 value to determine orientation of angle. */
+    double angle_ORIENTATION = position->at(2);
+    double angle_RKP = 0;
+
+    double transform_angle;
+
+    /* project keypoints. */
+    std::vector<Pair> projected_keypoint;
+
+    /* do all process if keypoints_list_for_projection is not empty. */
+    if(keypoints_list_for_projection.size() > 0)
+    {
+        for(int i = 0; i < keypoints_list_for_projection.size()+1; i++)
+        {
+            /* init the keypoint. */
+            Pair projected_kp;
+
+            /* put the target keypoint at the end of this list. */
+            /* compuute angle_RKP to now the direction, left or right. */
+            if(i == keypoints_list_for_projection.size())
+            {
+                Pair keypoint_format_pair(TKP->coordinate.first, TKP->coordinate.second);
+                angle_RKP            = compute_vector_RKP(keypoint_format_pair, *position);
+            }
+            else
+            {
+                Pair keypoint_format_pair(keypoints_list_for_projection[i]->coordinate.first, keypoints_list_for_projection[i]->coordinate.second);
+                angle_RKP            = compute_vector_RKP(keypoint_format_pair, *position);
+            }
+            
+            if( i != keypoints_list_for_projection.size() )
+            {
+                if(angle_ORIENTATION <= angle_RKP)
+                {
+                    if(angle_RKP - angle_ORIENTATION <= 180)
+                    {
+                        // Right 
+                        angle_RKP    = (180 - keypoints_list_for_projection[i]->target_angle);
+                    }
+                    else
+                    {
+                        // Left 
+                        angle_RKP    = -180 + keypoints_list_for_projection[i]->target_angle;
+                    }
+                }
+                else
+                {
+                    if(angle_ORIENTATION - angle_RKP <= 180)
+                    {
+                        // Left 
+                        angle_RKP    = -180 + keypoints_list_for_projection[i]->target_angle;
+                    }
+                    else
+                    {
+                        // Right 
+                        angle_RKP    = (180 - keypoints_list_for_projection[i]->target_angle);
+                    }
+                }
+            }
+            else
+            {
+                if(angle_ORIENTATION <= angle_RKP)
+                {
+                    if(angle_RKP - angle_ORIENTATION <= 180)
+                    {
+                        // Right 
+                        angle_RKP    = 180 - TKP->target_angle;
+                    }
+                    else
+                    {
+                        // Left 
+                        angle_RKP    = (-180) + TKP->target_angle;
+                    }
+                }
+                else
+                {
+                    if(angle_ORIENTATION - angle_RKP <= 180)
+                    {
+                        // Left 
+                        angle_RKP    = (-180) + TKP->target_angle;
+                    }
+                    else
+                    {
+                        // Right 
+                        angle_RKP    = 180 - TKP->target_angle;
+                    }
+                }
+            }
+
+            if(i == keypoints_list_for_projection.size())
+            {
+                /* only project the point in front of robot. */
+                if(abs(TKP->target_angle) <= 90)
+                {
+                    /* project the keypoint into the lidar local grid referencial (LLG). */
+                    projected_kp.first = sin(angle_RKP*M_PI/180)*TKP->distance_RKP*40/4+40;
+                    projected_kp.second = cos(angle_RKP*M_PI/180)*TKP->distance_RKP*40/4+40;
+                    projected_keypoint.push_back(projected_kp);
+                }
+            }
+            if(i != keypoints_list_for_projection.size())
+            {   
+                /* only project the point in front of robot. */
+                if(abs(keypoints_list_for_projection[i]->target_angle) <= 90)
+                {
+                    /* project the keypoint into the LLG referencial. */
+                    projected_kp.first = sin(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*40/4+40;
+                    projected_kp.second = cos(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*40/4+40;
+                    projected_keypoint.push_back(projected_kp);
+                }
+            }
+        }
+    }
+
+    return projected_keypoint;
 }

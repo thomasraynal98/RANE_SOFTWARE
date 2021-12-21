@@ -61,5 +61,6 @@
         "set": "cpp",
         "string": "cpp",
         "variant": "cpp"
-    }
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }
