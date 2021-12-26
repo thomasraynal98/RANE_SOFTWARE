@@ -134,7 +134,7 @@ void function_thread_C()
             if(security_break(&lidar_data))
             {
                 redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
-                next                       += std::chrono::milliseconds((int)2000);
+                next                       += std::chrono::milliseconds((int)1000);
                 std::this_thread::sleep_until(next);
             }
         }

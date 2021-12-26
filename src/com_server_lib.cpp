@@ -106,6 +106,7 @@ void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::
     current_socket->on("command_to_do", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
     {
         _lock->lock();
+        redis->set("State_is_autonomous", "false");
         redis->publish("command_micro", data->get_string());
         _lock->unlock();
     }));
@@ -116,6 +117,8 @@ void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::
         _lock->lock();
         std::string msg_destination = std::to_string(data->get_map()["i"]->get_int()) + "/" + std::to_string(data->get_map()["j"]->get_int()) + "/";
         redis->set("State_position_to_reach", msg_destination);
+        redis->set("State_is_autonomous", "true");
+        redis->set("State_destination_is_reach", "false");
         redis->set("State_need_compute_global_path", "true");
         _lock->unlock();
     }));
