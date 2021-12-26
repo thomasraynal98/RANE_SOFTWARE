@@ -984,3 +984,18 @@ void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param)
     // if one time navigation param.
     navigation_param->get_param = true;
 }
+
+bool security_break(std::vector<Pair>* data_lidar)
+{
+    // if they are lidar point in this area, run security break.
+    for(auto sample : *data_lidar)
+    {
+        if(sample.first >= 73 && sample.first <= 85 && \
+        sample.second >= 76 && sample.second <= 79 &&)
+        {
+            // 20 cm in front of robot.
+            return true;
+        }
+    }
+    return false;
+}

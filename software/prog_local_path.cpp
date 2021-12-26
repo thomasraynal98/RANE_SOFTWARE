@@ -37,16 +37,12 @@ void function_thread_A()
     ///TIMER//////////////////////////////////////////////////////////////////////////////////////////////////
     int frequency       = 50;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
-    std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
     auto next = std::chrono::high_resolution_clock::now();
     ///END////////////////////////////////////////////////////////////////////////////////////////////////////
 
     while(true)
     {
         ///TIMER///////////////////////////////////////////////////////////////////
-        x                          = std::chrono::high_resolution_clock::now();         
-        last_loop_time             = x;
         next                       += std::chrono::milliseconds((int)time_of_loop);
         std::this_thread::sleep_until(next);
         ///END/////////////////////////////////////////////////////////////////////
@@ -84,16 +80,12 @@ void function_thread_C()
     ///TIMER//////////////////////////////////////////////////////////////////////////////////////////////////
     int frequency       = 30;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
-    std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
     auto next = std::chrono::high_resolution_clock::now();
     ///END////////////////////////////////////////////////////////////////////////////////////////////////////
 
     while(true)
     {
         ///TIMER///////////////////////////////////////////////////////////////////
-        x                          = std::chrono::high_resolution_clock::now();         
-        last_loop_time             = x;
         next                       += std::chrono::milliseconds((int)time_of_loop);
         std::this_thread::sleep_until(next);
         ///END/////////////////////////////////////////////////////////////////////
@@ -107,7 +99,7 @@ void function_thread_C()
         // 0#. update keypoint path information.
         update_data(&redis, &global_path, &position);
 
-        // 2#. detect if we are arrived.
+        // 1#. detect if we are arrived.
         if(!destination_reach(&global_path.back(), position))
         {
             // 1#. compute target keypoint.
@@ -137,10 +129,18 @@ void function_thread_C()
                 compute_motor_autocommandeNico(&redis, &target_keypoint, 0, \
                 &position, &navigation_param);
             }
+
+            // 5#. security stop, if lidar data is on 20 cm trajector
+            if(security_break(&lidar_data))
+            {
+                redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
+                next                       += std::chrono::milliseconds((int)2000);
+                std::this_thread::sleep_until(next);
+            }
         }
         else
         {
-            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/")
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
             redis.set("State_destination_is_reach", "true");
         }
     }
