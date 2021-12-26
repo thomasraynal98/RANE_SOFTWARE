@@ -39,7 +39,7 @@ try
     // Create/Connect SLAM System
     // ******************************************************************
     slamcore::v0::SystemConfiguration sysCfg;
-    sysCfg.EnableWheelOdometry = true; /// @note Remember to enable this option!
+    sysCfg.EnableWheelOdometry = false; /// @note Remember to enable this option! 
     sysCfg.ConfigFilePath = ""; /// @note Please pass the path your wheel odometry calibration
                                 /// file here!
 
@@ -199,8 +199,8 @@ catch (...)
 
 bool check_map_data(sw::redis::Redis* redis)
 {
-    if(((*(redis->get("State_map_validate"))).compare("false") != 0) && \
-    ((*(redis->get("State_map_available"))).compare("false") != 0))
+    if(((*(redis->get("State_map_validate"))).compare("false") == 0) && \
+    ((*(redis->get("State_map_available"))).compare("false") == 0))
     {
         return false;
     }

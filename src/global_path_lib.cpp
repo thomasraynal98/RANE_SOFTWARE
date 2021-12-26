@@ -49,7 +49,7 @@ void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
     // compute global path.
     Pair current = get_current_position(redis);
     Pair target = get_destination_position(redis);
-    std::vector<Pair>* keypoint_global_path = aStarSearch(*grid, current, target, redis);
+    std::vector<Pair>* keypoint_global_path = aStarSearch(*grid, current, target, redis, 0);
     if(keypoint_global_path != NULL)
     {
         send_keypoint_global_path(redis, keypoint_global_path);
@@ -62,7 +62,7 @@ void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
     }
 }
 
-std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis)
+std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, int local_option)
 {
 	// If the source is out of range
 	if (!isValid(grid, src)) {
@@ -190,7 +190,9 @@ std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::R
                         
                         /* Transform the brut path to keypoint path. */
 
-						return from_global_path_to_keypoints_path(Path, redis);
+                        if(local_option == 1) { return from_global_path_to_keypoints_path(Path, redis, 1);}
+
+						return from_global_path_to_keypoints_path(Path, redis, 0);
 					}
 					// If the successor is already on the
 					// closed list or if it is blocked, then
@@ -281,7 +283,7 @@ bool isUnBlocked(cv::Mat grid, const Pair& point)
 	return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) == 255) || (grid.at<uchar>(point.second,point.first) == 200));
 }
 
-std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis* redis)
+std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis* redis, int local_option)
 {
     /*
         DESCRIPTION: the goal of this function is to take the brute global map
@@ -313,6 +315,9 @@ std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw:
         
         previous_p = p;
     }
+
+    // for local path planning only.
+    if(local_option == 1) { return &vector_global_path;}
     
     // Variable.
     bool first_keypoint = true;

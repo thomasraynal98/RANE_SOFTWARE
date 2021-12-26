@@ -1,6 +1,8 @@
-#include "global_path_lib.h"
+#ifndef LOCAL_PATH_LIB_H
+#define LOCAL_PATH_LIB_H
 
 #include <sw/redis++/redis++.h>
+#include "global_path_lib.h"
 
 struct Path_keypoint 
 {
@@ -39,9 +41,30 @@ struct Path_keypoint
         {}
 };
 
+struct Param_nav
+{
+    double V;
+    double K;
+    double F;
+    int back_angle;
+    double stall_pwm;
+    double unstall_pwm;
+    bool get_param;
+
+    Param_nav()
+        : V(0)
+        , K(0)
+        , F(0)
+        , back_angle(0)
+        , stall_pwm(0)
+        , unstall_pwm(0)
+        , get_param(false)
+        {}
+};
+
 std::vector<Pair> format_lidar_data(std::string raw_msg);
 bool check_process_LCDS(sw::redis::Redis* redis);
-cv::Mat show_local_environnement(cv::Mat grid, std::vector<Pair> data_lidar, std::vector<double> encoder_data);
+void show_local_environnement(cv::Mat* grid, std::vector<Pair>* data_lidar, std::vector<double>* encoder_data);
 void get_robot_speed(sw::redis::Redis* redis, std::vector<double>* encoder_data);
 void get_global_path(sw::redis::Redis* redis, std::vector<Path_keypoint>* encoder_data);
 double compute_distance_validation(Path_keypoint kp);
@@ -57,3 +80,10 @@ bool destination_reach(Path_keypoint* destination, std::vector<double> current_p
 void update_data(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position);
 std::vector<Pair> project_keypoint_in_lidar_referencial(std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position, Path_keypoint* TKP);
 std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypoints_list_for_projection, std::vector<double>* position, Path_keypoint* TKP);
+bool simulation_problem(int futur_ms, cv::Mat* grid, std::vector<double>* current_speed, std::vector<Pair>* data_lidar);
+bool TKP_problem(cv::Mat* grid, Path_keypoint* TKP, std::vector<Pair>* data_lidar);
+void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, Path_keypoint* target_keypoint);
+void compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, Path_keypoint* TKP);
+void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param);
+void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param);
+#endif

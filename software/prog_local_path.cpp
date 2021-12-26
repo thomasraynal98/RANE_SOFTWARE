@@ -13,13 +13,14 @@ using namespace sw::redis;
 auto redis = Redis("tcp://127.0.0.1:6379");
 std::thread thread_A, thread_B, thread_C;
 bool process_LCDS = false;
-bool debug_mode = false;
+bool debug_mode = true;
+Param_nav navigation_param;
 
-cv::Mat grid_RGB_1(40, 80, CV_8UC3, cv::Scalar(255, 255, 255));
-cv::Mat grid_Gray_1(40, 80, CV_8UC1, cv::Scalar(255));
+cv::Mat grid_RGB_1(80, 160, CV_8UC3, cv::Scalar(255, 255, 255));
+// cv::Mat grid_Gray_1(40, 80, CV_8UC1, cv::Scalar(255));
 
-cv::Mat grid_RGB_2(40, 80, CV_8UC3, cv::Scalar(255, 255, 255));
-cv::Mat grid_Gray_2(40, 80, CV_8UC1, cv::Scalar(255));
+cv::Mat grid_RGB_2(80, 160, CV_8UC3, cv::Scalar(255, 255, 255));
+cv::Mat grid_Gray_2(80, 160, CV_8UC1, cv::Scalar(255));
 
 std::vector<double> position;
 std::vector<double> current_speed;
@@ -61,6 +62,9 @@ void function_thread_A()
             get_global_path(&redis, &global_path);
             global_path_msg = (*(redis.get("State_global_path")));
         }
+
+        // download navigation param.
+        if(!navigation_param.get_param) { get_navigation_param(&redis, &navigation_param);}
     }
 }
 
@@ -96,53 +100,48 @@ void function_thread_C()
 
         if(debug_mode)
         {   
-            show_local_environnement(grid_RGB_1.clone(), lidar_data, current_speed);
+            cv::Mat clone = grid_RGB_1.clone();
+            show_local_environnement(&clone, &lidar_data, &current_speed);
         }
 
         // 0#. update keypoint path information.
         update_data(&redis, &global_path, &position);
 
-        if(process_LCDS)
+        // 2#. detect if we are arrived.
+        if(!destination_reach(&global_path.back(), position))
         {
             // 1#. compute target keypoint.
-            select_target_keypoint(&global_path, &target_keypoint);
+            select_target_keypoint_2(&global_path, &target_keypoint);
 
-            // 2#. detect if we are arrived.
-            // if(/destination_reach(&global_path.back(), position))
-            if(true)
+            // 3#. project some KP and TKP in LCDS.
+            std::vector<Pair> projected_keypoint = project_keypoint_in_lidar_referencial(&global_path, &position, &target_keypoint);
+
+            // 4#. check if we have problem.
+            cv::Mat clone = grid_RGB_2.clone();
+            if(simulation_problem(1000, &clone, &current_speed, &lidar_data) && \
+            TKP_problem(&clone, &target_keypoint, &lidar_data))
             {
-                // 3#. project some KP and TKP in LCDS.
-                std::vector<Pair> projected_keypoint = project_keypoint_in_lidar_referencial(&global_path, &position, &target_keypoint);
-                
-                std::cout << "oui" << projected_keypoint.size() << std::endl;
-                for(auto p : projected_keypoint){ std::cout << p.first << "," << p.second << "\n";}
 
-                if(true)
-                {
-                    cv::Mat clone = grid_RGB_2.clone();
+                // 4a#. compute a new TKP based on LCDS.
+                cv::Mat clone_gray = grid_Gray_2.clone();
+                compute_new_TKP(&clone, &projected_keypoint, &lidar_data, \
+                &clone_gray, &redis, &target_keypoint);
 
-                    for(auto data : projected_keypoint)
-                    {
-                        cv::circle(clone, cv::Point((int)(data.first),(int)(data.second)),0, cv::Scalar(255,0,0), cv::FILLED, 0, 0);
-                    }
-                    // show.
-                    cv::namedWindow("Local_env2",cv::WINDOW_AUTOSIZE);
-                    cv::resize(clone, clone, cv::Size(0,0),18.0,18.0,6);
-                    // cv::rotate(grid, grid, 1);
-                    cv::imshow("Local_env2", clone);
-
-                    char d=(char)cv::waitKey(25);
-                    // if(d==27)
-                    //     break;
-                }
-
-                // 4#. descision
+                compute_motor_autocommandeNico(&redis, &target_keypoint, 1, \
+                &position, &navigation_param);
 
             }
             else
             {
-                redis.set("State_destination_is_reach", "true");
+                // 4b#. no problem compute command with current TKP.
+                compute_motor_autocommandeNico(&redis, &target_keypoint, 0, \
+                &position, &navigation_param);
             }
+        }
+        else
+        {
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/")
+            redis.set("State_destination_is_reach", "true");
         }
     }
 }

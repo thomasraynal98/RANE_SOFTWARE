@@ -14,3 +14,4 @@ This repository will store all program for the futur RANE robot from HIVE ROBOTI
 qui va stopper les process automatique durant 1000 ms, sauf une commande special qui va tout arreter.
 * revoir le systeme de selection de target keypoint.
 * set all variable to zero when we start visual slam.
+* improve the global planning process with technique of my thesis.

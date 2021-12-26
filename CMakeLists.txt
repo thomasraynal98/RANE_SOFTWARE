@@ -118,7 +118,9 @@ TARGET_LINK_LIBRARIES(prog_global_path
 ADD_EXECUTABLE(prog_local_path
 software/prog_local_path.cpp
 src/local_path_lib.cpp 
-include/local_path_lib.h)
+include/local_path_lib.h
+src/global_path_lib.cpp 
+include/global_path_lib.h)
 
 TARGET_LINK_LIBRARIES(prog_local_path
     redis++
