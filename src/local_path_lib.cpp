@@ -991,7 +991,7 @@ bool security_break(std::vector<Pair>* data_lidar)
     for(auto sample : *data_lidar)
     {
         if(sample.first >= 73 && sample.first <= 85 && \
-        sample.second >= 76 && sample.second <= 79 &&)
+        sample.second >= 76 && sample.second <= 79)
         {
             // 20 cm in front of robot.
             return true;
