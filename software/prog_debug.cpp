@@ -7,15 +7,55 @@
 using namespace sw::redis;
 auto redis = Redis("tcp://127.0.0.1:6379");
 
+int start(sw::redis::Redis* redis)
+{   
+    std::string init = "init";
+    redis->set("Param_K", init);
+    redis->set("Param_V", init);
+    redis->set("Param_F", init);
+    redis->set("Param_back_angle", init);
+    redis->set("Param_stall_pwm", init);
+    redis->set("Param_unstall_pwm", init);
+    redis->set("Param_server_adress", init);
+    redis->set("Param_distance_btw_kp", init);
+    redis->set("Param_localisation", init);
+    redis->set("Param_id_current_map", init);
+    redis->set("Param_type_current_map", init);
+    redis->set("Param_saved_map", init);
+    redis->set("Param_modele", init);
+    redis->set("Param_version", init);
+    redis->set("Param_matricule", init);
+    redis->set("Param_exploitation", init);
+    redis->set("Param_link_session", init);
+    redis->set("Param_link_png", init);
+    redis->set("Param_prenom", init);
+    redis->set("Param_robot_length", init);
+
+    redis->set("State_slamcore", init);
+    redis->set("State_robot_position", init);
+    redis->set("State_robot_position_png", init);
+    redis->set("State_robot_speed", init);
+    redis->set("State_global_path_is_computing", "false");
+    redis->set("State_global_path", "no_path");
+    redis->set("State_is_autonomous", "true");
+    redis->set("State_destination_is_reach", "false");
+    redis->set("State_position_to_reach", "");
+    redis->set("State_need_compute_global_path", "false");
+    redis->set("State_map_validate", "true");
+    redis->set("State_map_available", "true");
+}
+
 int main()
 {
     ///TIMER//////////////////////////////////////////////////////////////////////////////////////////////////
-    int frequency       = 2;
+    int frequency       = 10;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
     auto next = std::chrono::high_resolution_clock::now();
     ///END////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    start(&redis);
 
     while(true)
     {
@@ -45,7 +85,8 @@ int main()
         std::cout << "Param_exploitation=" << *redis.get("Param_exploitation") << std::endl;
         std::cout << "Param_link_session=" << *redis.get("Param_link_session") << std::endl;
         std::cout << "Param_link_png=" << *redis.get("Param_link_png") << std::endl;
-        std::cout << "Param_prenom=" << *redis.get("Param_prenom") << std::endl << std::endl;
+        std::cout << "Param_prenom=" << *redis.get("Param_prenom") << std::endl;
+        std::cout << "Param_robot_length=" << *redis.get("Param_robot_length") << std::endl << std::endl;
 
         std::cout << "State_slamcore=" << *redis.get("State_slamcore") << std::endl;
         std::cout << "State_robot_position=" << *redis.get("State_robot_position") << std::endl;
@@ -59,7 +100,6 @@ int main()
         std::cout << "State_need_compute_global_path=" << *redis.get("State_need_compute_global_path") << std::endl;
         std::cout << "State_map_validate=" << *redis.get("State_map_validate") << std::endl;
         std::cout << "State_map_available=" << *redis.get("State_map_available") << std::endl;
-        std::cout << "State_destination_is_reach=" << *redis.get("State_destination_is_reach") << std::endl << std::endl;
     }
 
     return 0;

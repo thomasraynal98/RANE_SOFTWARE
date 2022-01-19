@@ -29,16 +29,14 @@ bool check_if_map_is_ready(sw::redis::Redis* redis)
     return false;
 }
 
-cv::Mat* import_map_png(sw::redis::Redis* redis)
+void import_map_png(sw::redis::Redis* redis, cv::Mat* grid)
 {   
     std::string link = "../data_software/map/" + *(redis->get("Param_localisation")) + "_" + *(redis->get("Param_id_current_map")) + ".png";
     cv::Mat map_weighted = cv::imread(link, cv::IMREAD_GRAYSCALE);
-    if(map_weighted.empty())
+    if(!map_weighted.empty())
     {
-        std::cout << "[ERROR] Could not read the image: " << link << std::endl;
-        return NULL;
+        *grid = map_weighted;
     }
-    return &map_weighted;
 }
 
 void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
@@ -49,10 +47,13 @@ void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
     // compute global path.
     Pair current = get_current_position(redis);
     Pair target = get_destination_position(redis);
-    std::vector<Pair>* keypoint_global_path = aStarSearch(*grid, current, target, redis, 0);
-    if(keypoint_global_path != NULL)
+    std::vector<Pair> keypoint_global_path;
+
+    aStarSearch(*grid, current, target, redis, 0, &keypoint_global_path);
+
+    if(keypoint_global_path.size() > 2)
     {
-        send_keypoint_global_path(redis, keypoint_global_path);
+        send_keypoint_global_path(redis, &keypoint_global_path);
         redis->set("State_need_compute_global_path", "false");
     }
     else
@@ -62,34 +63,46 @@ void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
     }
 }
 
-std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, int local_option)
+bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, int local_option, std::vector<Pair>* keypoint_global_path)
 {
+
 	// If the source is out of range
 	if (!isValid(grid, src)) {
 		printf("Source is invalid\n");
-		return NULL;
+		return false;
 	}
     
 	// If the destination is out of range
 	if (!isValid(grid, dest)) {
 		printf("Destination is invalid\n");
-		return NULL;
+		return false;;
 	}
 
 	// Either the source or the destination is blocked
 	if (!isUnBlocked(grid, src)) {
 		printf("Source is blocked\n");
-		return NULL;
+        Pair new_src = {-1,-1};
+        if(found_new_src(grid, src, &new_src))
+        {
+            src.first = new_src.first;
+            src.second = new_src.second;
+            printf("Alternatif source found\n");
+        }
+        else
+        {
+            printf("No new source found\n");
+            return false;
+        }
 	}
 	if (!isUnBlocked(grid, dest)) {
 		printf("Dest is blocked\n");
-		return NULL;
+		return false;;
 	}
 
 	// If the destination cell is the same as source cell
 	if (isDestination(src, dest)) {
 		printf("We are already at the destination\n");
-		return NULL;
+		return false;;
 	}
 
 	// Create a closed list and initialise it to false which
@@ -189,10 +202,13 @@ std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::R
                         } while (cellDetails[row][col].parent != next_node);
                         
                         /* Transform the brut path to keypoint path. */
-
-                        if(local_option == 1) { return from_global_path_to_keypoints_path(Path, redis, 1);}
-
-						return from_global_path_to_keypoints_path(Path, redis, 0);
+                        if(local_option == 1) 
+                        { 
+                            from_global_path_to_keypoints_path(Path, redis, 1, keypoint_global_path);
+                            return true;
+                        }
+                        from_global_path_to_keypoints_path(Path, redis, 0, keypoint_global_path);
+						return true;
 					}
 					// If the successor is already on the
 					// closed list or if it is blocked, then
@@ -206,7 +222,7 @@ std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::R
                         if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 255)
 						    {fNew = cellDetails[i][j].f + 1.0;}
                         if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 200)
-						    {fNew = cellDetails[i][j].f + 4.0;}
+						    {fNew = cellDetails[i][j].f + 6.0;} // IMPORTANT VALUE.
 
                         if(add_y != 0 && add_x !=0){fNew += 0.01;}
                         fNew = fNew + calculateHValue(neighbour, parent);
@@ -254,7 +270,7 @@ std::vector<Pair>* aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::R
 	// blockages)
 
 	printf("Failed to find the Destination Cell\n");
-    return NULL;
+    return false;
 }
 
 bool isValid(cv::Mat grid, const Pair& point)
@@ -283,7 +299,48 @@ bool isUnBlocked(cv::Mat grid, const Pair& point)
 	return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) == 255) || (grid.at<uchar>(point.second,point.first) == 200));
 }
 
-std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis* redis, int local_option)
+bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src)
+{
+    /*
+        DESCRIPTION: found new source if the current one is blocked.
+    */
+
+    // basic approach.
+    double search_distance = 5.0; // meters.
+    int search_box = (int)(search_distance*20.0); // 20 cases by 1m.
+    double closest_point_distance = 9999;
+
+    for(int i = -search_box; i < search_box; i++)
+    {
+        for(int j = -search_box; j < search_box; j++)
+        {
+            if(i >= 0 && i < grid.size[1] && j >= 0 && j < grid.size[0])
+            {
+                if((int)grid.at<uchar>(point.second+j, point.first+i) == 200 || \
+                (int)grid.at<uchar>(point.second+j, point.first+i) == 255)
+                {
+                    if(sqrt(pow(j,2)+pow(i,2))*0.05 < closest_point_distance)
+                    {
+                        closest_point_distance = sqrt(pow(j,2)+pow(i,2))*0.05;
+                        new_src->second = point.second+j;
+                        new_src->first  = point.first+i;
+                    }
+                }
+            }
+        }
+    }
+
+    if(new_src->first == -1) 
+    {
+        return false;
+    }
+    else 
+    {
+        return true;
+    } 
+}
+
+void from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis* redis, int local_option, std::vector<Pair>* keypoint_global_path)
 {
     /*
         DESCRIPTION: the goal of this function is to take the brute global map
@@ -295,7 +352,6 @@ std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw:
     double distance_between_keypoint = std::stod(*(redis->get("Param_distance_btw_kp")));
 
     // Transform stack into vector and compute distance from destination.
-    std::vector<Pair> keypoint_global_path;
     std::vector<Pair> vector_global_path;
     std::vector<double> vector_distances_from_destination;
     bool isDestination = true;
@@ -317,23 +373,27 @@ std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw:
     }
 
     // for local path planning only.
-    if(local_option == 1) { return &vector_global_path;}
+    if(local_option == 1) 
+    { 
+        *keypoint_global_path = vector_global_path;
+        return;
+    }
     
     // Variable.
     bool first_keypoint = true;
+    keypoint_global_path->clear();
 
     // Select Keypoints and compute data.
     for(int i = 0; i < vector_global_path.size(); i++)
     {   
         Pair current_keypoint;
-
         // OK it's the start point.
         if(i == 0)
         {   
             current_keypoint.first  = vector_global_path[i].first;
             current_keypoint.second = vector_global_path[i].second;
             // push.
-            keypoint_global_path.push_back(current_keypoint);
+            keypoint_global_path->push_back(current_keypoint);
         }
         // Ok it's the last point.
         else if(i == vector_global_path.size()-1)
@@ -341,21 +401,21 @@ std::vector<Pair>* from_global_path_to_keypoints_path(std::stack<Pair> Path, sw:
             current_keypoint.first  = vector_global_path[i].first;
             current_keypoint.second = vector_global_path[i].second;
             // push.
-            keypoint_global_path.push_back(current_keypoint);
+            keypoint_global_path->push_back(current_keypoint);
         }
         // Ok it's other point.
         else
         {
-            if(calculateHValue(keypoint_global_path.back(), vector_global_path[i])*0.05 >= distance_between_keypoint)
+            if(calculateHValue(keypoint_global_path->back(), vector_global_path[i])*0.05 >= distance_between_keypoint)
             {
                 current_keypoint.first  = vector_global_path[i].first;
                 current_keypoint.second = vector_global_path[i].second;
                 // push.
-                keypoint_global_path.push_back(current_keypoint);
+                keypoint_global_path->push_back(current_keypoint);
             }
         }
     }
-    return &keypoint_global_path;
+    return;
 }
 
 void send_keypoint_global_path(sw::redis::Redis* redis, std::vector<Pair>* keypoint_global_path)

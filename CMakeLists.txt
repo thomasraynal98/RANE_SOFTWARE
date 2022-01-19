@@ -133,6 +133,7 @@ ADD_EXECUTABLE(prog_debug
 software/prog_debug.cpp)
 
 TARGET_LINK_LIBRARIES(prog_debug
+    slamcore::slamcore
     redis++
     pthread
     hiredis

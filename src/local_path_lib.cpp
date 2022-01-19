@@ -21,7 +21,12 @@ std::vector<Pair> format_lidar_data(std::string raw_msg)
              /* Project brut data into lidar referencial grid. */
             lidar_push.first  = sin(value)*std::stod(T)*80.0/4.0+80.0;
             lidar_push.second = cos(value)*std::stod(T)*80.0/4.0+80.0;
-            lidar_data.push_back(lidar_push); 
+
+            if(lidar_push.first >= 0 && lidar_push.first < 180 && \
+            lidar_push.second >= 0 && lidar_push.second < 80)
+            {
+                lidar_data.push_back(lidar_push); 
+            }
         }
         i += 1;
     }
@@ -125,7 +130,7 @@ void get_robot_speed(sw::redis::Redis* redis, std::vector<double>* encoder_data)
 
 }
 
-void get_global_path(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_keypoint_path)
+bool get_global_path(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_keypoint_path)
 {
     global_keypoint_path->clear();
 
@@ -134,80 +139,90 @@ void get_global_path(sw::redis::Redis* redis, std::vector<Path_keypoint>* global
     std::string T;
     std::stringstream X(result);
 
-    // get all point.
-    bool end = false;
-    int coord_i = 0;
-    while(std::getline(X, T, '/'))
+    if(result.length() > 2 && !(result.compare("no_path") == 0))
     {
-        if(!end)
+        // get all point.
+        bool end = false;
+        int coord_i = 0;
+        while(std::getline(X, T, '/'))
         {
-            coord_i = std::stoi(T);
+            if(!end)
+            {
+                coord_i = std::stoi(T);
+            }
+            if(end)
+            {
+                Path_keypoint kp;
+                kp.coordinate.first = coord_i;
+                kp.coordinate.second = std::stoi(T);
+                global_keypoint_path->push_back(kp);
+            }
+            end = !end;
         }
-        if(end)
+
+        // fill in variable. back sens.
+        Pair destination;
+        std::vector<double> current_position = get_current_position_n(redis);
+        for(int i = global_keypoint_path->size()-1; i >= 0; i--)
         {
-            Path_keypoint kp;
-            kp.coordinate.first = coord_i;
-            kp.coordinate.second = std::stoi(T);
-            global_keypoint_path->push_back(kp);
+            if(i == global_keypoint_path->size()-1)
+            {
+                // the destination KP.
+                destination.first  = global_keypoint_path->at(i).coordinate.first;
+                destination.second = global_keypoint_path->at(i).coordinate.second;
+                global_keypoint_path->at(i).distance_KPD        = 0;
+                global_keypoint_path->at(i).isTryAvoidArea      = 200;
+                global_keypoint_path->at(i).distance_validation = 0.4; // arbitratry
+
+                // non fix variable.
+                global_keypoint_path->at(i).isReach             = false;
+                global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+                global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+            }
+            if(i == 0)
+            {
+                // the current position.
+                // fix variable.
+                std::vector<double> current_double;
+                current_double.push_back(global_keypoint_path->at(i).coordinate.first);
+                current_double.push_back(global_keypoint_path->at(i).coordinate.second);
+                global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_double)*0.05;
+                // current_keypoint.isTryAvoidArea      = map_weighted.at<uchar>(current_keypoint.coordinate.first, current_keypoint.coordinate.second);
+                global_keypoint_path->at(i).isTryAvoidArea  = 200;
+                global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
+                // non fix variable.
+                global_keypoint_path->at(i).isReach             = true;
+                global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+                global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+            }
+            if(i != 0 && i != global_keypoint_path->size()-1)
+            {
+                std::vector<double> current_double;
+                current_double.push_back(global_keypoint_path->at(i).coordinate.first);
+                current_double.push_back(global_keypoint_path->at(i).coordinate.second);
+                global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_double)*0.05;
+                global_keypoint_path->at(i).isTryAvoidArea      = 200;
+                global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
+
+                // non fix variable.
+                global_keypoint_path->at(i).isReach             = false;
+                global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
+                global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
+            }
         }
-        end = !end;
+
+        // fill validation angle.
+        for(int i = 0; i < global_keypoint_path->size(); i++)
+        {
+            if(i == 0){global_keypoint_path->at(i).validation_angle = 0;}
+            if(i == global_keypoint_path->size()-1){global_keypoint_path->at(i).validation_angle = 180;}
+            if(i > 0 && i < global_keypoint_path->size()-1) {global_keypoint_path->at(i).validation_angle = compute_validation_angle( global_keypoint_path->at(i-1).coordinate, \
+                                                                                                            global_keypoint_path->at(i).coordinate, \      
+                                                                                                   global_keypoint_path->at(i+1).coordinate);}
+        }
+        return true;
     }
-
-    // fill in variable. back sens.
-    Pair destination;
-    std::vector<double> current_position = get_current_position_n(redis);
-    for(int i = global_keypoint_path->size()-1; i >= 0; i--)
-    {
-        if(i == global_keypoint_path->size()-1)
-        {
-            // the destination KP.
-            destination.first  = global_keypoint_path->at(i).coordinate.first;
-            destination.second = global_keypoint_path->at(i).coordinate.second;
-            global_keypoint_path->at(i).distance_KPD        = 0;
-            global_keypoint_path->at(i).isTryAvoidArea      = 200;
-            global_keypoint_path->at(i).distance_validation = 0.4; // arbitratry
-
-            // non fix variable.
-            global_keypoint_path->at(i).isReach             = false;
-            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
-            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
-        }
-        if(i == 0)
-        {
-            // the current position.
-            // fix variable.
-            global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_position)*0.05;
-            // current_keypoint.isTryAvoidArea      = map_weighted.at<uchar>(current_keypoint.coordinate.first, current_keypoint.coordinate.second);
-            global_keypoint_path->at(i).isTryAvoidArea  = 200;
-            global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
-            
-            // non fix variable.
-            global_keypoint_path->at(i).isReach             = true;
-            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
-            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
-        }
-        if(i != 0 && i != global_keypoint_path->size()-1)
-        {
-            global_keypoint_path->at(i).distance_KPD        = compute_distance_RPK(destination, current_position)*0.05;
-            global_keypoint_path->at(i).isTryAvoidArea      = 200;
-            global_keypoint_path->at(i).distance_validation = compute_distance_validation(global_keypoint_path->at(i));
-
-            // non fix variable.
-            global_keypoint_path->at(i).isReach             = false;
-            global_keypoint_path->at(i).target_angle        = compute_target_angle(global_keypoint_path->at(i).coordinate, current_position);
-            global_keypoint_path->at(i).distance_RKP        = compute_distance_RPK(global_keypoint_path->at(i).coordinate, current_position)*0.05;
-        }
-    }
-
-    // fill validation angle.
-    for(int i = 0; i < global_keypoint_path->size(); i++)
-    {
-        if(i == 0){global_keypoint_path->at(i).validation_angle = 0;}
-        if(i == global_keypoint_path->size()-1){global_keypoint_path->at(i).validation_angle = 180;}
-        if(i > 0 && i < global_keypoint_path->size()-1) {global_keypoint_path->at(i).validation_angle = compute_validation_angle( global_keypoint_path->at(i-1).coordinate, \
-                                                                                                        global_keypoint_path->at(i).coordinate, \      
-                                                                                                        global_keypoint_path->at(i+1).coordinate);}
-    }
+    return false;
 }
 
 double compute_distance_validation(Path_keypoint kp)
@@ -460,7 +475,7 @@ void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, 
     for(int i = 0; i < global_path_keypoint->size(); i++)
     {
         if(i < index_TKP) {global_path_keypoint->at(i).isReach = true; }
-        else {global_path_keypoint->at(i).isReach = true; }
+        else {global_path_keypoint->at(i).isReach = false; }
     }
 
     /* PART 3. declare new TKP. */
@@ -469,6 +484,7 @@ void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, 
     target_keypoint->distance_RKP      = global_path_keypoint->at(index_TKP).distance_RKP;
     target_keypoint->target_angle      = global_path_keypoint->at(index_TKP).target_angle;
     target_keypoint->isReach           = global_path_keypoint->at(index_TKP).isReach;
+    target_keypoint->distance_KPD      = global_path_keypoint->at(index_TKP).distance_KPD;
 }
 
 void return_nearest_path_keypoint(double threshold, std::vector<Path_keypoint>* global_path_keypoint, std::vector<Path_keypoint*>* possible_candidate_target_keypoint)
@@ -514,7 +530,7 @@ void return_nearest_path_keypoint(double threshold, std::vector<Path_keypoint>* 
 
 bool destination_reach(Path_keypoint* destination, std::vector<double> current_position)
 {
-    if(compute_distance_RPK(destination->coordinate, current_position)*0.05 <= 0.5)
+    if(compute_distance_RPK(destination->coordinate, current_position)*0.05 <= 0.8)
     {
         return true;
     }
@@ -527,14 +543,17 @@ void update_data(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_key
     *current_position = get_current_position_n(redis);
 
     // update global information.
-    for(auto kp : *global_keypoint)
+    if(!global_keypoint->empty())
     {
-        kp.distance_RKP = compute_distance_RPK(kp.coordinate, *current_position)*0.05;
-        kp.target_angle = compute_target_angle(kp.coordinate, *current_position);
+        for(int i = 0; i < global_keypoint->size(); i++)
+        {
+            global_keypoint->at(i).distance_RKP = compute_distance_RPK(global_keypoint->at(i).coordinate, *current_position)*0.05;
+            global_keypoint->at(i).target_angle = compute_target_angle(global_keypoint->at(i).coordinate, *current_position);
+        }
     }
 }
 
-std::vector<Pair> project_keypoint_in_lidar_referencial(std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position, Path_keypoint* TKP)
+void project_keypoint_in_lidar_referencial(std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position, Path_keypoint* TKP, std::vector<Pair>* projected_keypoint)
 {
     /* DESCRIPTION:
         this function will take target keypoint in 6 meters range and project then in lidar
@@ -556,10 +575,10 @@ std::vector<Pair> project_keypoint_in_lidar_referencial(std::vector<Path_keypoin
 
     /* Project them in lidar referencial. The target KP to. */
     /* We need to change referencial angle. */
-    return transform_angle_in_lidar_ref(keypoints_list_for_projection, current_position, TKP);
+    transform_angle_in_lidar_ref(keypoints_list_for_projection, current_position, TKP, projected_keypoint);
 }
 
-std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypoints_list_for_projection, std::vector<double>* position, Path_keypoint* TKP)
+void transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypoints_list_for_projection, std::vector<double>* position, Path_keypoint* TKP, std::vector<Pair>* projected_keypoint)
 {
     /* DESCRIPTION:
         this function will take a list of keypoint to project and transform the angle to be 
@@ -571,9 +590,6 @@ std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypo
     double angle_RKP = 0;
 
     double transform_angle;
-
-    /* project keypoints. */
-    std::vector<Pair> projected_keypoint;
 
     /* do all process if keypoints_list_for_projection is not empty. */
     if(keypoints_list_for_projection.size() > 0)
@@ -596,7 +612,7 @@ std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypo
                 angle_RKP            = compute_vector_RKP(keypoint_format_pair, *position);
             }
             
-            if( i != keypoints_list_for_projection.size() )
+            if( i != keypoints_list_for_projection.size())
             {
                 if(angle_ORIENTATION <= angle_RKP)
                 {
@@ -661,9 +677,14 @@ std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypo
                 if(abs(TKP->target_angle) <= 90)
                 {
                     /* project the keypoint into the lidar local grid referencial (LLG). */
-                    projected_kp.first = sin(angle_RKP*M_PI/180)*TKP->distance_RKP*40/4+40;
-                    projected_kp.second = cos(angle_RKP*M_PI/180)*TKP->distance_RKP*40/4+40;
-                    projected_keypoint.push_back(projected_kp);
+                    projected_kp.first  = sin(angle_RKP*M_PI/180)*TKP->distance_RKP*80/4+80;
+                    projected_kp.second = cos(angle_RKP*M_PI/180)*TKP->distance_RKP*80/4+80;
+
+                    if((projected_kp.first >= 0 && projected_kp.first < 160) \
+                    && (projected_kp.second >= 0 && projected_kp.second < 80))
+                    {
+                        projected_keypoint->push_back(projected_kp);
+                    }
                 }
             }
             if(i != keypoints_list_for_projection.size())
@@ -672,15 +693,18 @@ std::vector<Pair> transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypo
                 if(abs(keypoints_list_for_projection[i]->target_angle) <= 90)
                 {
                     /* project the keypoint into the LLG referencial. */
-                    projected_kp.first = sin(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*40/4+40;
-                    projected_kp.second = cos(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*40/4+40;
-                    projected_keypoint.push_back(projected_kp);
+                    projected_kp.first  = sin(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*80/4+80;
+                    projected_kp.second = cos(angle_RKP*M_PI/180)*keypoints_list_for_projection[i]->distance_RKP*80/4+80;
+                    
+                    if((projected_kp.first >= 0 && projected_kp.first < 160) \
+                    && (projected_kp.second >= 0 && projected_kp.second < 80))
+                    {
+                        projected_keypoint->push_back(projected_kp);
+                    }
                 }
             }
         }
     }
-
-    return projected_keypoint;
 }
 
 bool simulation_problem(int futur_ms, cv::Mat* grid, std::vector<double>* current_speed, std::vector<Pair>* data_lidar)
@@ -722,7 +746,7 @@ bool simulation_problem(int futur_ms, cv::Mat* grid, std::vector<double>* curren
     bool is_on_trajectory = false;
     for(auto sample: *data_lidar)
     {
-        cv::Vec3b bgrPixel = grid->at<cv::Vec3b>(sample.first, sample.second);
+        cv::Vec3b bgrPixel = grid->at<cv::Vec3b>(sample.second, sample.first);
         if(bgrPixel.val[0] == 0 && bgrPixel.val[1] == 255 && bgrPixel.val[2] == 255)
         {
             is_on_trajectory = true;
@@ -746,24 +770,184 @@ bool TKP_problem(cv::Mat* grid_RGB, Path_keypoint* TKP, std::vector<Pair>* data_
     for(auto sample: *data_lidar)
     {   
         // try avoid.
-        cv::circle(*grid_RGB, cv::Point((int)(sample.first),(int)(sample.second)),12, cv::Scalar(255,242,212), cv::FILLED, 0,0);
+        cv::circle(*grid_RGB, cv::Point((int)(sample.first),(int)(sample.second)),13, cv::Scalar(255,242,212), cv::FILLED, 0,0);
+    }
+    for(auto sample: *data_lidar)
+    {   
         // no center in.
-        cv::circle(*grid_RGB, cv::Point((int)(sample.first),(int)(sample.second)),6, cv::Scalar(255,192,48), cv::FILLED, 0,0);
+        cv::circle(*grid_RGB, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(255,192,48), cv::FILLED, 0,0);
     }
 
     // 2. check if TKP is on sample lidar area.
     bool TKP_is_blocked = false;
-    cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(TKP->coordinate.first, TKP->coordinate.second);
-    if(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48)
-    {
-        TKP_is_blocked = true;
-    }
+    // cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(TKP->coordinate.second, TKP->coordinate.first);
+    // if(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48)
+    // {
+    //     TKP_is_blocked = true;
+    // }
 
     // 3. return the bool.
     return TKP_is_blocked;
 }
 
-void compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, \
+// bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, \
+// Path_keypoint* TKP)
+// {
+//     /*
+//         DESCRIPTION:
+//         this function will compute new TKP if the previous algorithm 
+//         detect problem on a current road.
+//     */
+
+//     // 3. prepare gray grid for local A* to destination.
+//     // make no go zone and try avoid area on grid and feed A*.
+
+//     for(auto sample : *data_lidar)
+//     {   
+//         // try avoid.
+//         cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),13, cv::Scalar(200), cv::FILLED, 0,0);
+//     }
+//     for(auto sample : *data_lidar)
+//     {   
+//         // no center in.
+//         cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(0), cv::FILLED, 0,0);
+//     }
+
+//     // 1. found the projected KP most far of robot.
+//     double distance_max = 0;
+//     double index_distance_max = -1;
+//     Pair new_destination; new_destination.first = -1; new_destination.second = -1;
+//     for(int i = 0; i < projected_keypoint->size(); i++)
+//     {
+//         if((projected_keypoint->at(i).first >= 0 && projected_keypoint->at(i).first < 160) \
+//         && (projected_keypoint->at(i).second >= 0 && projected_keypoint->at(i).second < 80))
+//         {
+//             double distance = sqrt(pow(79-projected_keypoint->at(i).first,2)+pow(79-projected_keypoint->at(i).second,2));
+//             if(distance > distance_max) 
+//             {
+//                 distance_max = distance;
+//                 index_distance_max = i;
+//                 new_destination.first = projected_keypoint->at(i).first;
+//                 new_destination.second = projected_keypoint->at(i).second;
+//             }
+//         }
+//     }
+
+//     // 2. create new destination.
+//     bool found = false;
+//     bool alternatif = false;
+//     int research_j = 0;
+//     int research_i = 0;
+//     int size_cube = 0;
+//     while(!found)
+//     {
+//         int index_i = new_destination.first;
+//         int index_j = new_destination.second;
+//         if(size_cube == 0)
+//         {
+//             cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
+//             if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
+//             {
+//                 found = true;
+//                 new_destination.first = index_i;
+//                 new_destination.second = index_j;
+//             }
+//             else
+//             {
+//                 size_cube++;
+//             }
+//         }
+//         else
+//         {
+//             for(int i = -size_cube; i <= size_cube; i++)
+//             {
+//                 for(int j = -size_cube; j <= size_cube; j++)
+//                 {
+//                     index_i = new_destination.first + i; index_j = new_destination.second + j;
+//                     if(index_i < 0){index_i = 0;}
+//                     if(index_i > 159){index_i = 159;}
+//                     if(index_j < 0){index_j = 0;}
+//                     if(index_j > 79){index_j = 79;}
+
+//                     cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
+
+//                     if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
+//                     {
+//                         found = true;
+//                         new_destination.first = index_i;
+//                         new_destination.second = index_j;
+//                         i = 2000; j = 2000; // leave for loops.
+//                     }
+//                 }
+//             }
+//             size_cube++;
+//         }
+//     }
+
+//     if(new_destination.first != -1 && new_destination.second != -1)
+//     {
+//         // 4. compute A*.
+//         bool result_astar = false;
+//         Pair current_position = {79,79};
+//         std::vector<Pair> local_path;
+//         result_astar = aStarSearch(*grid_gray, current_position, new_destination, redis, 1, &local_path);
+
+//         if(result_astar)
+//         {
+//             // astar algorythme found a path to the destination. Now we select a point on
+//             // this path to get the direction to follow. (index=6 ~30cm)
+//             if(local_path.size() > 6) 
+//             { 
+//                 TKP->coordinate.first  = local_path[6].first;
+//                 TKP->coordinate.second = local_path[6].second;
+//             }
+//             else
+//             {
+//                 TKP->coordinate.first  = local_path[local_path.size()-1].first;
+//                 TKP->coordinate.second = local_path[local_path.size()-1].second;
+//             }
+//             TKP->distance_RKP = sqrt(pow(79-TKP->coordinate.first,2)+pow(79-TKP->coordinate.second,2));
+            
+//             // compute angle in global ref for the command algorythme.
+//             int index_i = TKP->coordinate.first - 80;
+//             int index_j = 80 - TKP->coordinate.second;
+//             double angle_TKP = 9999;
+//             if(index_i != 0) { angle_TKP = atan((double)(index_j)/(double)(index_i));} //in rad (-PI to PI)
+//             else
+//             {
+//                 index_i = 0.01;
+//                 angle_TKP = atan((double)(index_j)/(double)(index_i));
+//             }
+//             // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
+//             if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
+//             else {angle_TKP = (-M_PI_2 - angle_TKP);}
+//             TKP->target_angle = -angle_TKP;
+
+//             // ONLY FOR VISUALISATION.
+//             if(true)
+//             {
+//                 for(auto path: local_path)
+//                 {
+//                     cv::circle(*grid_RGB, cv::Point((int)(path.first),(int)(path.second)),0, cv::Scalar(30,255,20), cv::FILLED, 0,0);
+//                 }
+//                 for(auto projected_KP : *projected_keypoint)
+//                 {
+//                     cv::circle(*grid_RGB, cv::Point((int)(projected_KP.first),(int)(projected_KP.second)),0, cv::Scalar(255,0,251), cv::FILLED, 0,0);
+//                 }
+//                 cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
+//                 cv::resize(*grid_RGB, *grid_RGB, cv::Size(0,0),9.0,9.0,6);
+//                 cv::imshow("Local_env_debug", *grid_RGB);
+//                 char d=(char)cv::waitKey(25);
+//             }
+
+//             return true;
+//         }
+//     }
+//     std::cout << "RETURN FALSE" << std::endl;
+//     return false;
+// }
+
+bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, \
 Path_keypoint* TKP)
 {
     /*
@@ -772,132 +956,180 @@ Path_keypoint* TKP)
         detect problem on a current road.
     */
 
-    // 1. found the projected KP most far of robot.
-    double distance_max = 0;
-    double index_distance_max = -1;
-    Pair new_destination;
-    for(int i = 0; i < projected_keypoint->size(); i++)
-    {
-        if((projected_keypoint->at(i).first >= 0 && projected_keypoint->at(i).first < 160) \
-        && (projected_keypoint->at(i).second >= 0 && projected_keypoint->at(i).second < 80))
-        {
-            double distance = sqrt(pow(79-projected_keypoint->at(i).first,2)+pow(79-projected_keypoint->at(i).second,2));
-            if(distance > distance_max) 
-            {
-                index_distance_max = i;
-                new_destination.first = projected_keypoint->at(i).first;
-                new_destination.second = projected_keypoint->at(i).second;
-            }
-        }
-    }
-
-    // 2. create new destination.
-    bool found = false;
-    bool alternatif = false;
-    int research_j = 0;
-    int research_i = 0;
-    int size_cube = 0;
-    while(!found)
-    {
-        int index_i = new_destination.first;
-        int index_j = new_destination.second;
-        if(size_cube == 0)
-        {
-            cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_i, index_j);
-            if(bgrPixel.val[0] != 255 && bgrPixel.val[1] != 192 && bgrPixel.val[2] != 48)
-            {
-                found = true;
-                new_destination.first = index_i;
-                new_destination.second = index_j;
-            }
-            else
-            {
-                size_cube++;
-            }
-        }
-        else
-        {
-            for(int i = -size_cube; i <= size_cube; i++)
-            {
-                for(int j = -size_cube; j <= size_cube; j++)
-                {
-                    index_i += i; index_j+= j;
-                    if(index_i < 0){index_i = 0;}
-                    if(index_i > 79){index_i = 79;}
-                    if(index_j < 0){index_j = 0;}
-                    if(index_j > 79){index_j = 79;}
-                    cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_i, index_j);
-                    if(bgrPixel.val[0] != 255 && bgrPixel.val[1] != 192 && bgrPixel.val[2] != 48)
-                    {
-                        found = true;
-                        new_destination.first = index_i;
-                        new_destination.second = index_j;
-                        i = 2000; j = 2000; // leave for loops.
-                    }
-                }
-            }
-            size_cube++;
-        }
-    }
-
-    // 3. prepare gray grid for local A* to destination.
+    // 1. prepare gray grid for local A* to destination.
     // make no go zone and try avoid area on grid and feed A*.
+    bool draw_invisible_area = false;
+
     for(auto sample : *data_lidar)
     {   
         // try avoid.
-        cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),12, cv::Scalar(200), cv::FILLED, 0,0);
+        cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),13, cv::Scalar(200), cv::FILLED, 0,0);
+    }
+    for(auto sample : *data_lidar)
+    {   
         // no center in.
-        cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),6, cv::Scalar(0), cv::FILLED, 0,0);
+        cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(0), cv::FILLED, 0,0);
     }
 
-    // 4. compute A*.
-    Pair current_position;
-    current_position.first  = 79;
-    current_position.second = 79;
-    std::vector<Pair>* local_path = aStarSearch(*grid_gray, current_position, new_destination, redis, 1);
+    // cv::Mat clneur = grid_gray->clone();
+    // draw_invisible_map(grid_gray, &clneur);
+    // cv::namedWindow("Local_env_debug3",cv::WINDOW_AUTOSIZE);
+    // cv::resize(clneur, clneur, cv::Size(0,0),9.0,9.0,6);
+    // cv::imshow("Local_env_debug3", clneur);
+    // char d=(char)cv::waitKey(25);
 
-    // 4. select new TKP in this local A*.
-    // INFO: we will chose a point at 30 cm of robot (index=6)
-    if(local_path->size() > 6) 
-    { 
-        TKP->coordinate.first  = local_path->at(6).first;
-        TKP->coordinate.second = local_path->at(6).second;
-    }
-    else
+    int w = 0;
+    int tentative = projected_keypoint->size();
+    double distance_w = 9999;
+    while(w < tentative) // go from two to two.
     {
-        TKP->coordinate.first  = local_path->at(local_path->size()-1).first;
-        TKP->coordinate.second = local_path->at(local_path->size()-1).second;
+        w++;
+
+        Pair new_destination;
+        double distance_max = 0;
+
+        // Get the fartest keypoint on the projected map.
+        for(int i = 0; i < projected_keypoint->size(); i++)
+        {
+            double distance = sqrt(pow(79-projected_keypoint->at(i).first,2)+pow(79-projected_keypoint->at(i).second,2));
+            if(distance > distance_max && distance < distance_w)
+            {
+                distance_max = distance;
+                new_destination.first  = projected_keypoint->at(i).first;
+                new_destination.second = projected_keypoint->at(i).second;
+            }
+        }
+        distance_w = distance_max;
+
+        // 2. check the current local destination if they are available, else, 
+        // try found a new one.
+        bool found      = false;
+        bool alternatif = false;
+        int research_j  = 0;
+        int research_i  = 0;
+        int size_cube   = 0;
+        while(!found)
+        {
+            int index_i = new_destination.first;
+            int index_j = new_destination.second;
+            if(size_cube == 0)
+            {
+                cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
+                if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
+                {
+                    found = true;
+                    new_destination.first = index_i;
+                    new_destination.second = index_j;
+                }
+                else
+                {
+                    size_cube++;
+                }
+            }
+            else
+            {
+                for(int i = -size_cube; i <= size_cube; i++)
+                {
+                    for(int j = -size_cube; j <= size_cube; j++)
+                    {
+                        index_i = new_destination.first + i; index_j = new_destination.second + j;
+                        if(index_i < 0){index_i = 0;}
+                        if(index_i > 159){index_i = 159;}
+                        if(index_j < 0){index_j = 0;}
+                        if(index_j > 79){index_j = 79;}
+                        cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
+
+                        if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
+                        {
+                            found = true;
+                            new_destination.first = index_i;
+                            new_destination.second = index_j;
+                            i = 2000; j = 2000; // leave for loops.
+                        }
+                    }
+                }
+                size_cube++;
+            }
+        }
+
+        // 3. compute A*.
+        bool result_astar = false;
+        Pair current_position = {79,79};
+        std::vector<Pair> local_path;
+        result_astar = aStarSearch(*grid_gray, current_position, new_destination, redis, 1, &local_path);
+
+        if(result_astar)
+        {
+            int try_avoid_comptor = try_avoid_detector(grid_gray, &local_path);
+            std::cout << "TAILLE:" << try_avoid_comptor << std::endl;
+
+            if(try_avoid_comptor < 7)
+            {
+                // astar algorythme found a path to the destination. Now we select a point on
+                // this path to get the direction to follow. (index=6 ~30cm)
+                if(local_path.size() > 6) 
+                { 
+                    TKP->coordinate.first  = local_path[6].first;
+                    TKP->coordinate.second = local_path[6].second;
+                }
+                else
+                {
+                    TKP->coordinate.first  = local_path[local_path.size()-1].first;
+                    TKP->coordinate.second = local_path[local_path.size()-1].second;
+                }
+                TKP->distance_RKP = sqrt(pow(79-TKP->coordinate.first,2)+pow(79-TKP->coordinate.second,2));
+                
+                // compute angle in global ref for the command algorythme.
+                int index_i = TKP->coordinate.first - 79;
+                int index_j = 79 - TKP->coordinate.second;
+                double angle_TKP = 9999;
+                if(index_i != 0) { angle_TKP = atan((double)(index_j)/(double)(index_i));} //in rad (-PI to PI)
+                else
+                {
+                    index_i = 0.01;
+                    angle_TKP = atan((double)(index_j)/(double)(index_i));
+                }
+
+                // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
+                if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
+                else {angle_TKP = (-M_PI_2 - angle_TKP);}
+                TKP->target_angle = -angle_TKP;
+
+                // ONLY FOR VISUALISATION.
+                if(true)
+                {
+                    for(auto path: local_path)
+                    {
+                        cv::circle(*grid_RGB, cv::Point((int)(path.first),(int)(path.second)),0, cv::Scalar(30,255,20), cv::FILLED, 0,0);
+                    }
+                    for(auto projected_KP : *projected_keypoint)
+                    {
+                        cv::circle(*grid_RGB, cv::Point((int)(projected_KP.first),(int)(projected_KP.second)),0, cv::Scalar(255,0,251), cv::FILLED, 0,0);
+                    }
+                    cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
+                    cv::resize(*grid_RGB, *grid_RGB, cv::Size(0,0),9.0,9.0,6);
+                    cv::imshow("Local_env_debug", *grid_RGB);
+                    char d=(char)cv::waitKey(25);
+                }
+                return true;
+            }
+            else
+            {
+                if(!draw_invisible_area)
+                {
+                    draw_invisible_area = true;
+                    cv::Mat cloneur = grid_gray->clone();
+                    draw_invisible_map(grid_gray, &cloneur);
+                    *grid_gray = cloneur.clone();
+                }
+            }
+        }
     }
-    TKP->distance_RKP = sqrt(pow(79-TKP->coordinate.first,2)+pow(79-TKP->coordinate.second,2));
     
-    // 5. compute angle in global ref.
-    int index_i = TKP->coordinate.first - 80;
-    int index_j = 80 - TKP->coordinate.second;
-    double angle_TKP = 9999;
-    if(index_i != 0) { angle_TKP = atan((double)(index_j)/(double)(index_i));} //in rad (-PI to PI)
-    else
-    {
-        index_i = 0.01;
-        angle_TKP = atan((double)(index_j)/(double)(index_i));
-    }
-    // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
-    if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
-    else {angle_TKP = (-M_PI_2 - angle_TKP);}
-    TKP->target_angle = angle_TKP;
-
-    // 5. for visualisation, we can draw projected KP on RGB matrix.
-    for(auto projected_KP : *projected_keypoint)
-    {
-        cv::circle(*grid_RGB, cv::Point((int)(projected_KP.first),(int)(projected_KP.second)),0, cv::Scalar(255,0,251), cv::FILLED, 0,0);
-    }
-    if(false)
-    {
-        cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
-        cv::resize(*grid_RGB, *grid_RGB, cv::Size(0,0),9.0,9.0,6);
-        // cv::rotate(grid, grid, 1);
-        cv::imshow("Local_env_debug", *grid_RGB);
-        char d=(char)cv::waitKey(25);
-    }
+    // Condition to be here,
+    // --> no keypoint projected.
+    // --> no reacheable keypoint.
+    return false;
 }
 
 void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param)
@@ -944,32 +1176,61 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
     // if (abs(alpha)>back_angle){
     //     F = 0;
     // }
-    double rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
-    double leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
 
-    //make sure the robot will move
-    if(abs(leftspeed) < stall_pwm)
-    {
-        leftspeed     = unstall_pwm * leftspeed/abs(leftspeed);
-    }
-    if(abs(rightspeed) < stall_pwm)
-    {
-        rightspeed    = unstall_pwm * rightspeed/abs(rightspeed);
-    }
-
-    // std::cout <<  angle_RKP << " " << angle_ORIENTATION << " " << alpha << "[LS:" << leftspeed << ", RS:" << rightspeed << "\n";
-    
-    // send to robot  
     std::string msg_command = "1/";
-    int direction;
-    if(leftspeed>0) {direction = 1;}
-    else {direction = -1;}
-    for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(leftspeed) + "/";}
-    if(rightspeed>0) {direction = 1;}
-    else {direction = -1;}
-    for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(rightspeed) + "/";}
+    if(abs(alpha) < 1.309) // 75°
+    {
+        double rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
+        double leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
+
+        //make sure the robot will move
+        if(abs(leftspeed) < stall_pwm)
+        {
+            leftspeed     = unstall_pwm * leftspeed/abs(leftspeed);
+        }
+        if(abs(rightspeed) < stall_pwm)
+        {
+            rightspeed    = unstall_pwm * rightspeed/abs(rightspeed);
+        }
+
+        // std::cout <<  angle_RKP << " " << angle_ORIENTATION << " " << alpha << "[LS:" << leftspeed << ", RS:" << rightspeed << "\n";
+        
+        // send to robot  
+        int direction;
+        if(leftspeed>0) {direction = 1;}
+        else {direction = -1;}
+        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(leftspeed) + "/";}
+        if(rightspeed>0) {direction = 1;}
+        else {direction = -1;}
+        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(rightspeed) + "/";}
+    }
+    else
+    {
+        if(alpha > 1.309)
+        {
+            msg_command += "1/0.2/1/0.2/1/0.2/-1/0.2/-1/0.2/-1/0.2/";
+        }
+        if(alpha < -1.309)
+        {
+            msg_command += "-1/0.2/-1/0.2/-1/0.2/1/0.2/1/0.2/1/0.2/";
+        }
+    }
 
     redis->publish("command_micro", msg_command);
+}
+
+double get_length_path(std::vector<Pair>* local_path)
+{
+    /*
+        DESCRIPTION: this function take a path in argument and will return the total length 
+        of the path.
+    */
+   double distance = 0;
+   for(int i = 0; i < local_path->size()-1; i++)
+   {
+       distance += sqrt(pow(local_path->at(i).first-local_path->at(i+1).first,2)+pow(local_path->at(i).second-local_path->at(i+1).second,2))*0.05;
+   }
+   return distance;
 }
 
 void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param)
@@ -998,4 +1259,82 @@ bool security_break(std::vector<Pair>* data_lidar)
         }
     }
     return false;
+}
+
+void draw_invisible_map(cv::Mat* grid_G, cv::Mat* grid_C)
+{
+    /*
+        DESCRIPTION: This function will write on cv::mat the part hide behind lidar point.
+    */
+
+    std::vector<Pair> border;
+    int size_point = 4;
+    double pas = 40;
+
+    // LEFT & RIGHT.
+    for(int j = 79; j >= 0; j--)
+    {
+        Pair dest = {0,j};
+        border.push_back(dest);
+
+        dest = {159,j};
+        border.push_back(dest);
+    }
+
+    // UP.
+    for(int i = 0; i < 160; i++)
+    {
+        Pair dest = {i,0};
+        border.push_back(dest);
+    }
+
+    // DRAW.
+    for(auto dest : border)
+    {
+        bool is_blocked = false;
+        double coef = 0;
+        if(dest.second - 79 == 0) { coef = 0;}
+        else { coef = (dest.second - 79.0) / (dest.first - 79.0);}
+
+        if(dest.first < 79 )
+        {
+            for(double i = 79; i >= dest.first; i -= (79-dest.first)/pas)
+            {
+                double y = (coef*(i-dest.first)+dest.second);
+                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(50), cv::FILLED, 0,0);
+                if(!is_blocked && (int)grid_G->at<uchar>((int)(y), (int)(i)) == 0) { is_blocked = true;}
+            }
+        }
+        // if(dest.first == 79)
+        // {
+        //     for(int j = 79; j > 0; j -= (int)(79/pas))
+        //     {
+        //         if(is_blocked) cv::circle(*grid_G, cv::Point((int)(j),(int)(79)), size_point, cv::Scalar(0), cv::FILLED, 0,0);
+        //         if(!is_blocked && (int)grid_G->at<uchar>((int)(j), (int)(79)) == 0) { is_blocked = true;}
+        //     }
+        // }
+        if(dest.first > 79)
+        {
+            for(double i = 79; i <= dest.first; i += (dest.first-79)/pas)
+            {
+                int y = (int)(coef*(i-dest.first)+dest.second);
+                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(50), cv::FILLED, 0,0);
+                if(!is_blocked && (int)grid_G->at<uchar>((int)(y), (int)(i)) == 0) { is_blocked = true;}
+            }
+        }
+    }
+}
+
+int try_avoid_detector(cv::Mat* grid_G, std::vector<Pair>* local_path)
+{
+    /*
+        DESCRIPTION: This function will count the number of try avoid case in the path.
+    */
+
+    int comptor = 0;
+    for(auto cell : *local_path)
+    {
+        if((int)grid_G->at<uchar>((int)(cell.first), (int)(cell.second)) == 200) { comptor++;}
+    }
+    return comptor;
 }
