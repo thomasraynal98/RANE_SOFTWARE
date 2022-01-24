@@ -35,7 +35,7 @@ void function_thread_A()
     // (except subscriber: raw_data_lidar)
 
     ///TIMER//////////////////////////////////////////////////////////////////////////////////////////////////
-    int frequency       = 50;
+    int frequency       = 10;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     auto next = std::chrono::high_resolution_clock::now();
     ///END////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +62,8 @@ void function_thread_A()
         }
 
         // download navigation param.
-        if(!navigation_param.get_param) { get_navigation_param(&redis, &navigation_param);}
+        // if(!navigation_param.get_param) { get_navigation_param(&redis, &navigation_param);}
+        get_navigation_param(&redis, &navigation_param);
     }
 }
 
@@ -104,6 +105,9 @@ void function_thread_C()
         cv::Mat cloned = grid_RGB_2.clone();
         cv::Mat clonedg = grid_Gray_2.clone();
 
+        bool LINEMODE;
+        LINEMODE = true;
+
         std::vector<Pair> FDP;
         compute_new_TKP(&cloned, &FDP, &lidar_data, \
                 &clonedg, &redis, &target_keypoint);
@@ -117,6 +121,7 @@ void function_thread_C()
             if(!destination_reach(&global_path.back(), position) && \
             (*(redis.get("State_global_path_is_computing"))).compare("false") == 0 && \
             (*(redis.get("State_destination_is_reach"))).compare("false") == 0 && \
+            (*(redis.get("State_is_autonomous"))).compare("true") == 0 && \
             (*(redis.get("State_slamcore"))).compare("OK") == 0)
             {
                 // 1#. compute target keypoint.
@@ -140,7 +145,7 @@ void function_thread_C()
                 &clone_gray, &redis, &target_keypoint))
                 {
                     compute_motor_autocommandeNico(&redis, &target_keypoint, 1, \
-                    &position, &navigation_param);
+                    &position, &navigation_param, &LINEMODE);
                 }
                 else
                 {
@@ -165,7 +170,7 @@ void function_thread_C()
                     {
                         // This case occurend when the robot is not in the good rotation.
                         compute_motor_autocommandeNico(&redis, &target_keypoint, 0, \
-                        &position, &navigation_param);
+                        &position, &navigation_param, &LINEMODE);
                     }
                 }
 

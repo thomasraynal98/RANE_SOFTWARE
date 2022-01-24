@@ -1083,20 +1083,20 @@ Path_keypoint* TKP)
                 int index_i = TKP->coordinate.first - 79;
                 int index_j = 79 - TKP->coordinate.second;
                 double angle_TKP = 9999;
-                if(index_i != 0) { angle_TKP = atan((double)(index_j)/(double)(index_i));} //in rad (-PI to PI)
+                if(index_i != 0) { angle_TKP = atan2((double)(index_j),(double)(index_i));} //in rad (-PI to PI)
                 else
                 {
                     index_i = 0.01;
-                    angle_TKP = atan((double)(index_j)/(double)(index_i));
+                    angle_TKP = atan2((double)(index_j),(double)(index_i));
                 }
 
                 // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
-                if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
-                else {angle_TKP = (-M_PI_2 - angle_TKP);}
-                TKP->target_angle = -angle_TKP;
+                // if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
+                // else {angle_TKP = (-M_PI_2 - angle_TKP);}
+                TKP->target_angle = angle_TKP - M_PI_2;
 
                 // ONLY FOR VISUALISATION.
-                if(true)
+                if(false)
                 {
                     for(auto path: local_path)
                     {
@@ -1132,13 +1132,13 @@ Path_keypoint* TKP)
     return false;
 }
 
-void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param)
+void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param, bool* LINEMODE)
 {
     /*
         DESCRIPTION: http://faculty.salina.k-state.edu/tim/robot_prog/MobileBot/Steering/pointFwd.html
     */
-    double angle_ORIENTATION;
-    double angle_RKP;
+    double angle_ORIENTATION = 0;
+    double angle_RKP = 0;
 
     if(option == 0)
     {
@@ -1166,6 +1166,17 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
         alpha         = (angle_RKP - angle_ORIENTATION) * M_PI / 180; // difference in rad between robot angle and targetvector angle
         alpha         += M_PI;
         alpha         = atan2(sin(alpha), cos(alpha));                //[-PI:PI]
+        if(TKP->distance_KPD > 2.0)
+        {
+            if(alpha > 0 && alpha < M_PI_2)
+            {
+                alpha = M_PI - alpha;
+            }
+            else
+            {
+                alpha = -(M_PI + alpha);
+            }
+        }
     }
     if(option == 1)
     {
@@ -1177,42 +1188,55 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
     //     F = 0;
     // }
 
+    // if(option == 0) { std::cout << "[ALPHA:" << alpha << "]" << std::endl;}
+
+    // std::cout << "[TARGET_ANGLE_ALPHA:" << alpha << "][ABS:" << abs(alpha) << "][ANGLE_RKP:" << angle_RKP << "]" << std::endl;
+
     std::string msg_command = "1/";
-    if(abs(alpha) < 1.309) // 75°
-    {
-        double rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
-        double leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
+    // if(option == 0)
+    // {
+    //     // NO KEYPOINT PROJECT OR WE ARRIVE TO DESTINATION.
+    //     if(alpha > 0)
+    //     {
+    //         msg_command += "-1/0.2/-1/0.2/-1/0.2/1/0.2/1/0.2/1/0.2/";
+    //     }
+    //     else
+    //     {
+    //         msg_command += "1/0.2/1/0.2/1/0.2/-1/0.2/-1/0.2/-1/0.2/";
+    //     }
+    // }
+    // if(option == 1) 
 
-        //make sure the robot will move
-        if(abs(leftspeed) < stall_pwm)
-        {
-            leftspeed     = unstall_pwm * leftspeed/abs(leftspeed);
-        }
-        if(abs(rightspeed) < stall_pwm)
-        {
-            rightspeed    = unstall_pwm * rightspeed/abs(rightspeed);
-        }
+    std::cout << "[ALPHA:" << alpha << "]" <<  *LINEMODE << std::endl;
+    double rightspeed;
+    double leftspeed;
+    if(abs(alpha)<M_PI_4+(35*M_PI/180) && *LINEMODE){
+        rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
+        leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
 
-        // std::cout <<  angle_RKP << " " << angle_ORIENTATION << " " << alpha << "[LS:" << leftspeed << ", RS:" << rightspeed << "\n";
-        
-        // send to robot  
+                // send to robot  
         int direction;
         if(leftspeed>0) {direction = 1;}
         else {direction = -1;}
-        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(leftspeed) + "/";}
+        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(leftspeed)) + "/";}
         if(rightspeed>0) {direction = 1;}
         else {direction = -1;}
-        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(rightspeed) + "/";}
-    }
-    else
-    {
-        if(alpha > 1.309)
+        for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(rightspeed)) + "/";}
+
+    }else{
+        //! MODE CHRENO
+        // double magicrotspeed=1.0;
+        // rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
+        // leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
+
+        //! MODE THRESHOLD
+        if(alpha > 0)
         {
-            msg_command += "1/0.2/1/0.2/1/0.2/-1/0.2/-1/0.2/-1/0.2/";
+            msg_command += "-1/0.15/-1/0.15/-1/0.15/1/0.15/1/0.15/1/0.15/";
         }
-        if(alpha < -1.309)
+        else
         {
-            msg_command += "-1/0.2/-1/0.2/-1/0.2/1/0.2/1/0.2/1/0.2/";
+            msg_command += "1/0.15/1/0.15/1/0.15/-1/0.15/-1/0.15/-1/0.15/";
         }
     }
 

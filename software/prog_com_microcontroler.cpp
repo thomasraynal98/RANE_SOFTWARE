@@ -50,14 +50,13 @@ void function_thread_A()
         next                       += std::chrono::milliseconds((int)time_of_loop);
         std::this_thread::sleep_until(next);
         //
-
         if(connection != NULL)
         {
             send_ping_micro(connection, &ping_time);
         }
         else
         {
-            connection = found_micro_port(0,true);
+            connection = found_micro_port(1,true);
         }
     }
 }
@@ -81,14 +80,13 @@ void function_thread_C()
     auto next = std::chrono::high_resolution_clock::now();
     std::string reponse;
     char stop = '\n';   
-    const unsigned int msTimeout = 100; // 50Hz
+    // const unsigned int msTimeout = 100; // 50Hz
 
     while(true)
     {
         if(connection != NULL && connection->IsOpen())
         {
-            connection->ReadLine(reponse, stop, msTimeout);
-
+            connection->ReadLine(reponse, stop);
             if(reponse.size() > 0)
             {
                 if(reponse[0] == '0')
@@ -117,8 +115,8 @@ void function_thread_C()
             if((int)time_span.count() > 700)
             {
                 // we don't receive ping/pong.
-                connection->Close();
-                connection = NULL;
+                // connection->Close();
+                // connection = NULL;
             }
             
         }
@@ -152,7 +150,7 @@ void function_thread_D()
         std::this_thread::sleep_until(next);
         //
 
-        if(last_command_motor_micro.compare(last_command_motor) != 0)
+        if(last_command_motor_micro.compare(last_command_motor) != 0 && connection != NULL)
         {
             send_command_micro(connection, last_command_motor);
         }
@@ -166,8 +164,8 @@ int main()
     sub.subscribe("command_micro");
 
     // detect teensy port.
-    connection = found_micro_port(0,true);
-
+    connection = found_micro_port(1,true);
+    std::cout << "FOUND CONNECTION:" << connection <<  std::endl;
     // run thread.
     thread_A = std::thread(&function_thread_A);
     thread_B = std::thread(&function_thread_B, &sub);

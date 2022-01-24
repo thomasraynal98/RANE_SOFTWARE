@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=c++17 -pthread -lredis++ -lhiredis -o CPUUsage -O3 -DNDEBUG   CMakeFiles/prog_com_microcontroler.dir/software/prog_com_microcontroler.cpp.o CMakeFiles/prog_com_microcontroler.dir/src/com_micro_lib.cpp.o  -o prog_com_microcontroler -Wl,-rpath,/usr/local/lib -lredis++ -lpthread -lhiredis /usr/local/lib/libserial.so 

@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=c++17 -pthread -lredis++ -lhiredis -o CPUUsage -O3 -DNDEBUG   CMakeFiles/prog_com_server.dir/software/prog_com_server.cpp.o CMakeFiles/prog_com_server.dir/src/com_server_lib.cpp.o  -o prog_com_server -lredis++ -lpthread -lhiredis libsioclient.a 

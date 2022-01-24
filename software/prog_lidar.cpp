@@ -136,7 +136,7 @@ int main()
             for(auto point : scan.points)
             {
                 /* Only take the no obstruted data. */
-                if(abs(point.angle)>M_PI_2)
+                if(abs(point.angle)>M_PI_2+(10*M_PI/180))
                 {
                     /* Init observation variable. */
                     Lidar_data observation;

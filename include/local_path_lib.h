@@ -85,7 +85,7 @@ bool TKP_problem(cv::Mat* grid, Path_keypoint* TKP, std::vector<Pair>* data_lida
 void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, Path_keypoint* target_keypoint);
 bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, Path_keypoint* TKP);
 void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param);
-void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param);
+void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param, bool* LINEMODE);
 bool security_break(std::vector<Pair>* data_lidar);
 double get_length_path(std::vector<Pair>* local_path);
 void draw_invisible_map(cv::Mat* grid, cv::Mat* gridB);
