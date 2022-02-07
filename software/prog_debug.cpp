@@ -43,6 +43,12 @@ int start(sw::redis::Redis* redis)
     redis->set("State_need_compute_global_path", "false");
     redis->set("State_map_validate", "true");
     redis->set("State_map_available", "true");
+
+    redis->set("State_order", "NO_ORDER");
+    redis->set("State_connection_base", "NO_CONNECTION");
+    redis->set("State_robot", "WAITING");
+    redis->set("State_module_identifiant", "XXXXXXXXXXXXX");
+    redis->set("State_base_identifiant", "RANE_MK3_KODA_1");
 }
 
 int main()
@@ -100,6 +106,12 @@ int main()
         std::cout << "State_need_compute_global_path=" << *redis.get("State_need_compute_global_path") << std::endl;
         std::cout << "State_map_validate=" << *redis.get("State_map_validate") << std::endl;
         std::cout << "State_map_available=" << *redis.get("State_map_available") << std::endl;
+
+        std::cout << "State_order=" << *redis.get("State_order") << std::endl;
+        std::cout << "State_connection_base=" << *redis.get("State_connection_base") << std::endl;
+        std::cout << "State_robot=" << *redis.get("State_robot") << std::endl;
+        std::cout << "State_module_identifiant=" << *redis.get("State_module_identifiant") << std::endl;
+        std::cout << "State_base_identifiant=" << *redis.get("State_base_identifiant") << std::endl;
     }
 
     return 0;

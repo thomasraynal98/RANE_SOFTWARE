@@ -1,1 +1,0 @@
-/usr/bin/c++   -std=c++17 -pthread -lredis++ -lhiredis -o CPUUsage -O3 -DNDEBUG   CMakeFiles/exempleB.dir/software/exempleB.cpp.o  -o exempleB -lredis++ -lpthread -lhiredis 

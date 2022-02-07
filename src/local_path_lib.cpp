@@ -758,12 +758,11 @@ bool simulation_problem(int futur_ms, cv::Mat* grid, std::vector<double>* curren
     return is_on_trajectory;
 }
 
-bool TKP_problem(cv::Mat* grid_RGB, Path_keypoint* TKP, std::vector<Pair>* data_lidar)
+bool draw_lidar_data(cv::Mat* grid_RGB, Path_keypoint* TKP, std::vector<Pair>* data_lidar)
 {
     /*
         DESCRIPTION:
-        this function will check if the TKP is block by lidar data.
-        return true if it's block.
+        this function will draw all data sample on the current local map.
     */
 
     // 1. draw it on grid.
@@ -777,175 +776,8 @@ bool TKP_problem(cv::Mat* grid_RGB, Path_keypoint* TKP, std::vector<Pair>* data_
         // no center in.
         cv::circle(*grid_RGB, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(255,192,48), cv::FILLED, 0,0);
     }
-
-    // 2. check if TKP is on sample lidar area.
-    bool TKP_is_blocked = false;
-    // cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(TKP->coordinate.second, TKP->coordinate.first);
-    // if(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48)
-    // {
-    //     TKP_is_blocked = true;
-    // }
-
-    // 3. return the bool.
-    return TKP_is_blocked;
+    return true;
 }
-
-// bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, \
-// Path_keypoint* TKP)
-// {
-//     /*
-//         DESCRIPTION:
-//         this function will compute new TKP if the previous algorithm 
-//         detect problem on a current road.
-//     */
-
-//     // 3. prepare gray grid for local A* to destination.
-//     // make no go zone and try avoid area on grid and feed A*.
-
-//     for(auto sample : *data_lidar)
-//     {   
-//         // try avoid.
-//         cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),13, cv::Scalar(200), cv::FILLED, 0,0);
-//     }
-//     for(auto sample : *data_lidar)
-//     {   
-//         // no center in.
-//         cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(0), cv::FILLED, 0,0);
-//     }
-
-//     // 1. found the projected KP most far of robot.
-//     double distance_max = 0;
-//     double index_distance_max = -1;
-//     Pair new_destination; new_destination.first = -1; new_destination.second = -1;
-//     for(int i = 0; i < projected_keypoint->size(); i++)
-//     {
-//         if((projected_keypoint->at(i).first >= 0 && projected_keypoint->at(i).first < 160) \
-//         && (projected_keypoint->at(i).second >= 0 && projected_keypoint->at(i).second < 80))
-//         {
-//             double distance = sqrt(pow(79-projected_keypoint->at(i).first,2)+pow(79-projected_keypoint->at(i).second,2));
-//             if(distance > distance_max) 
-//             {
-//                 distance_max = distance;
-//                 index_distance_max = i;
-//                 new_destination.first = projected_keypoint->at(i).first;
-//                 new_destination.second = projected_keypoint->at(i).second;
-//             }
-//         }
-//     }
-
-//     // 2. create new destination.
-//     bool found = false;
-//     bool alternatif = false;
-//     int research_j = 0;
-//     int research_i = 0;
-//     int size_cube = 0;
-//     while(!found)
-//     {
-//         int index_i = new_destination.first;
-//         int index_j = new_destination.second;
-//         if(size_cube == 0)
-//         {
-//             cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
-//             if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
-//             {
-//                 found = true;
-//                 new_destination.first = index_i;
-//                 new_destination.second = index_j;
-//             }
-//             else
-//             {
-//                 size_cube++;
-//             }
-//         }
-//         else
-//         {
-//             for(int i = -size_cube; i <= size_cube; i++)
-//             {
-//                 for(int j = -size_cube; j <= size_cube; j++)
-//                 {
-//                     index_i = new_destination.first + i; index_j = new_destination.second + j;
-//                     if(index_i < 0){index_i = 0;}
-//                     if(index_i > 159){index_i = 159;}
-//                     if(index_j < 0){index_j = 0;}
-//                     if(index_j > 79){index_j = 79;}
-
-//                     cv::Vec3b bgrPixel = grid_RGB->at<cv::Vec3b>(index_j, index_i);
-
-//                     if(!(bgrPixel.val[0] == 255 && bgrPixel.val[1] == 192 && bgrPixel.val[2] == 48))
-//                     {
-//                         found = true;
-//                         new_destination.first = index_i;
-//                         new_destination.second = index_j;
-//                         i = 2000; j = 2000; // leave for loops.
-//                     }
-//                 }
-//             }
-//             size_cube++;
-//         }
-//     }
-
-//     if(new_destination.first != -1 && new_destination.second != -1)
-//     {
-//         // 4. compute A*.
-//         bool result_astar = false;
-//         Pair current_position = {79,79};
-//         std::vector<Pair> local_path;
-//         result_astar = aStarSearch(*grid_gray, current_position, new_destination, redis, 1, &local_path);
-
-//         if(result_astar)
-//         {
-//             // astar algorythme found a path to the destination. Now we select a point on
-//             // this path to get the direction to follow. (index=6 ~30cm)
-//             if(local_path.size() > 6) 
-//             { 
-//                 TKP->coordinate.first  = local_path[6].first;
-//                 TKP->coordinate.second = local_path[6].second;
-//             }
-//             else
-//             {
-//                 TKP->coordinate.first  = local_path[local_path.size()-1].first;
-//                 TKP->coordinate.second = local_path[local_path.size()-1].second;
-//             }
-//             TKP->distance_RKP = sqrt(pow(79-TKP->coordinate.first,2)+pow(79-TKP->coordinate.second,2));
-            
-//             // compute angle in global ref for the command algorythme.
-//             int index_i = TKP->coordinate.first - 80;
-//             int index_j = 80 - TKP->coordinate.second;
-//             double angle_TKP = 9999;
-//             if(index_i != 0) { angle_TKP = atan((double)(index_j)/(double)(index_i));} //in rad (-PI to PI)
-//             else
-//             {
-//                 index_i = 0.01;
-//                 angle_TKP = atan((double)(index_j)/(double)(index_i));
-//             }
-//             // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
-//             if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
-//             else {angle_TKP = (-M_PI_2 - angle_TKP);}
-//             TKP->target_angle = -angle_TKP;
-
-//             // ONLY FOR VISUALISATION.
-//             if(true)
-//             {
-//                 for(auto path: local_path)
-//                 {
-//                     cv::circle(*grid_RGB, cv::Point((int)(path.first),(int)(path.second)),0, cv::Scalar(30,255,20), cv::FILLED, 0,0);
-//                 }
-//                 for(auto projected_KP : *projected_keypoint)
-//                 {
-//                     cv::circle(*grid_RGB, cv::Point((int)(projected_KP.first),(int)(projected_KP.second)),0, cv::Scalar(255,0,251), cv::FILLED, 0,0);
-//                 }
-//                 cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
-//                 cv::resize(*grid_RGB, *grid_RGB, cv::Size(0,0),9.0,9.0,6);
-//                 cv::imshow("Local_env_debug", *grid_RGB);
-//                 char d=(char)cv::waitKey(25);
-//             }
-
-//             return true;
-//         }
-//     }
-//     std::cout << "RETURN FALSE" << std::endl;
-//     return false;
-// }
 
 bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, \
 Path_keypoint* TKP)
@@ -970,13 +802,6 @@ Path_keypoint* TKP)
         // no center in.
         cv::circle(*grid_gray, cv::Point((int)(sample.first),(int)(sample.second)),7, cv::Scalar(0), cv::FILLED, 0,0);
     }
-
-    // cv::Mat clneur = grid_gray->clone();
-    // draw_invisible_map(grid_gray, &clneur);
-    // cv::namedWindow("Local_env_debug3",cv::WINDOW_AUTOSIZE);
-    // cv::resize(clneur, clneur, cv::Size(0,0),9.0,9.0,6);
-    // cv::imshow("Local_env_debug3", clneur);
-    // char d=(char)cv::waitKey(25);
 
     int w = 0;
     int tentative = projected_keypoint->size();
@@ -1090,9 +915,6 @@ Path_keypoint* TKP)
                     angle_TKP = atan2((double)(index_j),(double)(index_i));
                 }
 
-                // put in motor commande referenciel [-90,0,90] we are currently in [0,-90,90,0]
-                // if(angle_TKP > 0) {angle_TKP = (M_PI_2 - angle_TKP);}
-                // else {angle_TKP = (-M_PI_2 - angle_TKP);}
                 TKP->target_angle = angle_TKP - M_PI_2;
 
                 // ONLY FOR VISUALISATION.
@@ -1183,29 +1005,7 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
         alpha         = TKP->target_angle;
     }
 
-    // we don't have sensors behind so don't move backwards
-    // if (abs(alpha)>back_angle){
-    //     F = 0;
-    // }
-
-    // if(option == 0) { std::cout << "[ALPHA:" << alpha << "]" << std::endl;}
-
-    // std::cout << "[TARGET_ANGLE_ALPHA:" << alpha << "][ABS:" << abs(alpha) << "][ANGLE_RKP:" << angle_RKP << "]" << std::endl;
-
     std::string msg_command = "1/";
-    // if(option == 0)
-    // {
-    //     // NO KEYPOINT PROJECT OR WE ARRIVE TO DESTINATION.
-    //     if(alpha > 0)
-    //     {
-    //         msg_command += "-1/0.2/-1/0.2/-1/0.2/1/0.2/1/0.2/1/0.2/";
-    //     }
-    //     else
-    //     {
-    //         msg_command += "1/0.2/1/0.2/1/0.2/-1/0.2/-1/0.2/-1/0.2/";
-    //     }
-    // }
-    // if(option == 1) 
 
     std::cout << "[ALPHA:" << alpha << "]" <<  *LINEMODE << std::endl;
     double rightspeed;
@@ -1228,7 +1028,7 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
         // double magicrotspeed=1.0;
         // rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
         // leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
-
+        
         //! MODE THRESHOLD
         if(alpha > 0)
         {

@@ -1,3 +1,4 @@
 data_software/
 build/
+thirdparty/
 *.so

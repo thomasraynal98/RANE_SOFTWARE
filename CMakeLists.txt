@@ -5,14 +5,9 @@ PROJECT(rane_software VERSION 1.0)
 
 # include directories.
 INCLUDE_DIRECTORIES(include)
-INCLUDE_DIRECTORIES(src)
-include_directories(
-     ${CMAKE_SOURCE_DIR}
-)
 
 # include Socket IO.
 include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/socket.io-client-cpp/CMakeLists.txt)
-#include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/sdk/CMakeLists.txt)
 
 # set good gcc version.
 set(CMAKE_CXX_STANDARD 17)
@@ -21,11 +16,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -lredis++ -lhiredis 
 
 # found package.
 FIND_PACKAGE(OpenCV 4 REQUIRED)
+FIND_PACKAGE(ydlidar_sdk REQUIRED)
 FIND_PACKAGE(slamcore_sdk REQUIRED)
-INCLUDE_DIRECTORIES( ${OpenCV_INCLUDE_DIRS})
 
-find_package(ydlidar_sdk REQUIRED)
-#Include directories
 include_directories(
   ${YDLIDAR_SDK_INCLUDE_DIRS}
 )
@@ -140,8 +133,19 @@ ADD_EXECUTABLE(prog_debug
 software/prog_debug.cpp)
 
 TARGET_LINK_LIBRARIES(prog_debug
-    slamcore::slamcore
     redis++
     pthread
     hiredis
     ${OpenCV_LIBS})
+
+# PROGRAMME MODULE MANAGERS.
+ADD_EXECUTABLE(prog_module_mng
+software/prog_module_mng.cpp
+src/com_micro_lib.cpp 
+include/com_micro_lib.h)
+
+TARGET_LINK_LIBRARIES(prog_module_mng
+    redis++
+    pthread
+    hiredis
+    /usr/local/lib/libserial.so)

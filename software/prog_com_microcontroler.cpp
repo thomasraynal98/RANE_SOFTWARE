@@ -20,7 +20,7 @@ std::string last_command_motor = "";
 std::string last_command_motor_micro = "";
 std::thread thread_A, thread_B, thread_C, thread_D;
 std::chrono::high_resolution_clock::time_point ping_time = std::chrono::high_resolution_clock::now();
-std::chrono::high_resolution_clock::time_point pong_time = std::chrono::high_resolution_clock::now();;
+std::chrono::high_resolution_clock::time_point pong_time = std::chrono::high_resolution_clock::now();
 
 void callback_command(std::string channel, std::string msg)
 {

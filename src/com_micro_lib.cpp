@@ -66,6 +66,13 @@ void send_ping_micro(LibSerial::SerialPort* connection, std::chrono::high_resolu
     *ping_time = std::chrono::high_resolution_clock::now();
 }
 
+void send_ping_module(LibSerial::SerialPort* connection, std::chrono::high_resolution_clock::time_point* ping_time)
+{
+    std::string ping_message = "0/";
+    connection->Write(ping_message);
+    *ping_time = std::chrono::high_resolution_clock::now();
+}
+
 void send_command_micro(LibSerial::SerialPort* connection, std::string motor_message)
 {
     connection->Write(motor_message);
@@ -74,4 +81,38 @@ void send_command_micro(LibSerial::SerialPort* connection, std::string motor_mes
 void publish_raw_data_encoder(sw::redis::Redis* redis, std::string encoder_message)
 {
     redis->publish("raw_data_encoder", encoder_message);
+}
+
+void inform_module(sw::redis::Redis* redis, LibSerial::SerialPort* connection)
+{
+    /*
+        State_status_order
+        State_base_identifiant
+    */
+
+    std::string message = "1/";
+    message += "RANE_MK3_KODA_1/" + *(redis->get("State_status_order")) + "/\n";
+    connection->Write(message);
+
+    message = "2/";
+    message += *(redis->get("State_order")) + "/\n";
+    connection->Write(message);
+}
+
+void get_module_information(sw::redis::Redis* redis, std::string msg)
+{
+    /*
+        msg description: 1/A/B/
+        A = identifiant module "DEL_V1_1"
+    */
+
+    std::string T;
+    std::stringstream X(msg);
+    
+    int i = 0;
+    while(std::getline(X, T, '/'))
+    {
+        if(i == 1) { redis->set("State_module_identifiant", T);}
+        i += 1;
+    }
 }

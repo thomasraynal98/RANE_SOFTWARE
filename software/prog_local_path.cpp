@@ -62,7 +62,6 @@ void function_thread_A()
         }
 
         // download navigation param.
-        // if(!navigation_param.get_param) { get_navigation_param(&redis, &navigation_param);}
         get_navigation_param(&redis, &navigation_param);
     }
 }
@@ -112,34 +111,30 @@ void function_thread_C()
         compute_new_TKP(&cloned, &FDP, &lidar_data, \
                 &clonedg, &redis, &target_keypoint);
 
-        // 0#. update keypoint path information.
+        // A#. update keypoint path information.
         if(!global_path.empty())
         {
             update_data(&redis, &global_path, &position);
 
-            // 1#. detect if we are arrived && if the global path is not computing.
+            // B#. detect if we are arrived && if the global path is not computing.
             if(!destination_reach(&global_path.back(), position) && \
             (*(redis.get("State_global_path_is_computing"))).compare("false") == 0 && \
             (*(redis.get("State_destination_is_reach"))).compare("false") == 0 && \
             (*(redis.get("State_is_autonomous"))).compare("true") == 0 && \
             (*(redis.get("State_slamcore"))).compare("OK") == 0)
             {
-                // 1#. compute target keypoint.
+                // 1#. compute the classic target keypoint.
                 select_target_keypoint_2(&global_path, &target_keypoint);
 
-                // 3#. project some KP and TKP in LCDS.
+                // 2#. project global path keypoint into the current local lidar map.
                 std::vector<Pair> projected_keypoint; 
                 project_keypoint_in_lidar_referencial(&global_path, &position, &target_keypoint, &projected_keypoint);
 
-                // 4#. check if we have problem.
+                // 3#. write lidar sample on clone cv::mat.
                 cv::Mat clone = grid_RGB_2.clone();
+                draw_lidar_data(&clone, &target_keypoint, &lidar_data);
 
-                // TODO: change TKP_problem because we change process, we only need to 
-                // write lidar sample on clone cv::mat.
-                // simulation_problem(2000, &clone, &current_speed, &lidar_data);
-                TKP_problem(&clone, &target_keypoint, &lidar_data);
-
-                // 4a#. compute a new TKP based on LCDS.
+                // 4#. compute a new TKP based on LCDS.
                 cv::Mat clone_gray = grid_Gray_2.clone();
                 if(compute_new_TKP(&clone, &projected_keypoint, &lidar_data, \
                 &clone_gray, &redis, &target_keypoint))
@@ -149,6 +144,7 @@ void function_thread_C()
                 }
                 else
                 {
+                    //! This mean that no Global path KP could be projected in LCDS.
                     // Check if we destination is blocked du to drift.
                     if(target_keypoint.distance_KPD < 3.0)
                     {
@@ -173,20 +169,6 @@ void function_thread_C()
                         &position, &navigation_param, &LINEMODE);
                     }
                 }
-
-                // // TODO:DEBUG=============================================================
-                // cv::Mat clone3 = grid_RGB_1.clone();
-                // for(auto kp : projected_keypoint)
-                // {
-                //     cv::circle(clone3, cv::Point((int)(kp.first),(int)(kp.second)),0, cv::Scalar(255,0,0), cv::FILLED, 0, 0);
-                // }
-                // cv::namedWindow("Local_env2",cv::WINDOW_AUTOSIZE);
-                // cv::resize(clone3, clone3, cv::Size(0,0),9.0,9.0,6);
-                // // cv::rotate(grid, grid, 1);
-                // cv::imshow("Local_env2", clone3);
-                // TODO:DEBUG=============================================================
-
-                // char d=(char)cv::waitKey(25);
 
                 // 5#. security stop, if lidar data is on 20 cm trajector
                 if(security_break(&lidar_data))

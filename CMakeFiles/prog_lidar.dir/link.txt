@@ -1,1 +1,0 @@
-/usr/bin/c++   -std=c++17 -pthread -lredis++ -lhiredis -o CPUUsage -O3 -DNDEBUG   CMakeFiles/prog_lidar.dir/software/prog_lidar.cpp.o CMakeFiles/prog_lidar.dir/src/lidar_lib.cpp.o  -o prog_lidar -lredis++ -lpthread -lhiredis -lydlidar_sdk -lpthread -lrt -lhiredis -lydlidar_sdk -lrt 

@@ -81,7 +81,7 @@ void update_data(sw::redis::Redis* redis, std::vector<Path_keypoint>* global_key
 void project_keypoint_in_lidar_referencial(std::vector<Path_keypoint>* global_keypoint, std::vector<double>* current_position, Path_keypoint* TKP, std::vector<Pair>* projected_keypoint);
 void transform_angle_in_lidar_ref(std::vector<Path_keypoint*> keypoints_list_for_projection, std::vector<double>* position, Path_keypoint* TKP, std::vector<Pair>* projected_keypoint);
 bool simulation_problem(int futur_ms, cv::Mat* grid, std::vector<double>* current_speed, std::vector<Pair>* data_lidar);
-bool TKP_problem(cv::Mat* grid, Path_keypoint* TKP, std::vector<Pair>* data_lidar);
+bool draw_lidar_data(cv::Mat* grid, Path_keypoint* TKP, std::vector<Pair>* data_lidar);
 void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, Path_keypoint* target_keypoint);
 bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, Path_keypoint* TKP);
 void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param);
