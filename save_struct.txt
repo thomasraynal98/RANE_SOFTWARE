@@ -1,0 +1,69 @@
+//! THIS V2 PROGRAM FOR MODULE MANAGEMENT HAS FOR OBJECTIF TO WORK.
+//! SIMPLE - SPEED - NO SERIAL LIBRARY - OLD SCHOOL
+
+#include <sw/redis++/redis++.h>
+#include <iostream>
+#include <chrono>
+#include <fstream>
+#include <thread>
+#include <unistd.h>
+#include <sys/stat.h>
+
+#include <com_micro_lib.h>
+
+using namespace sw::redis;
+
+auto redis = Redis("tcp://127.0.0.1:6379");
+std::thread thread_A, thread_B;
+std::ifstream usbRead;
+std::ofstream usbWrite;
+
+void function_thread_A()
+{
+    /*
+        DESCRIPTION:
+            1. Talk with other device.
+    */
+    //! CHRONO TIMER VARIABLE
+    int frequency       = 10;                              // en Hz.
+    double time_of_loop = 1000/frequency;                  // en milliseconde.
+    std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
+    auto next = std::chrono::high_resolution_clock::now();
+    //! CHRONO TIMER VARIABLE
+
+    while(true)
+    {
+        //! CHRONO TIMER VARIABLE
+        x                          = std::chrono::high_resolution_clock::now();         
+        last_loop_time             = x;
+        next                       += std::chrono::milliseconds((int)time_of_loop);
+        std::this_thread::sleep_until(next);
+        //! CHRONO TIMER VARIABLE
+
+    }
+}
+void function_thread_B()
+{
+    /*
+        DESCRIPTION:
+            1. Listen other device.
+    */
+    //! NO TIME FREQUENCY.
+
+    while(true)
+    {
+        
+    }
+}
+
+int main()
+{
+    thread_A = std::thread(&function_thread_A);
+    thread_B = std::thread(&function_thread_B);
+
+    thread_A.join();
+    thread_B.join();
+
+    return 0; 
+}

@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <chrono>
+#include <fstream>
+#include <sys/stat.h>
 
 
 LibSerial::SerialPort* found_micro_port(int debug_mode, bool wait_option)
@@ -41,7 +43,7 @@ LibSerial::SerialPort* found_micro_port(int debug_mode, bool wait_option)
             
             try{ serial_port->Write(message);}
             catch(std::runtime_error ex) { std::cout << "nop\n"; }
-            
+
             std::string reponse;
             serial_port->ReadLine(reponse);
             if(debug_mode==1) {std::cout << "reponse:" << reponse;}
@@ -66,10 +68,10 @@ void send_ping_micro(LibSerial::SerialPort* connection, std::chrono::high_resolu
     *ping_time = std::chrono::high_resolution_clock::now();
 }
 
-void send_ping_module(LibSerial::SerialPort* connection, std::chrono::high_resolution_clock::time_point* ping_time)
+void send_ping_module(std::ofstream& usbWrite, std::chrono::high_resolution_clock::time_point* ping_time)
 {
-    std::string ping_message = "0/";
-    connection->Write(ping_message);
+    std::string ping_message = "0/HELLO_BASE";
+    usbWrite << ping_message;
     *ping_time = std::chrono::high_resolution_clock::now();
 }
 
@@ -83,7 +85,7 @@ void publish_raw_data_encoder(sw::redis::Redis* redis, std::string encoder_messa
     redis->publish("raw_data_encoder", encoder_message);
 }
 
-void inform_module(sw::redis::Redis* redis, LibSerial::SerialPort* connection)
+void inform_module(sw::redis::Redis* redis, std::ofstream& usbWrite)
 {
     /*
         State_status_order
@@ -91,12 +93,12 @@ void inform_module(sw::redis::Redis* redis, LibSerial::SerialPort* connection)
     */
 
     std::string message = "1/";
-    message += "RANE_MK3_KODA_1/" + *(redis->get("State_status_order")) + "/\n";
-    connection->Write(message);
+    message += "RANE_MK3_KODA_1/" + *(redis->get("State_robot")) + "/\n";
+    usbWrite << message;
 
     message = "2/";
     message += *(redis->get("State_order")) + "/\n";
-    connection->Write(message);
+    usbWrite << message;
 }
 
 void get_module_information(sw::redis::Redis* redis, std::string msg)
@@ -115,4 +117,22 @@ void get_module_information(sw::redis::Redis* redis, std::string msg)
         if(i == 1) { redis->set("State_module_identifiant", T);}
         i += 1;
     }
+}
+
+bool fileExists(const std::string& filename)
+{
+    struct stat buf;
+    if (stat(filename.c_str(), &buf) != -1)
+    {
+        return true;
+    }
+    return false;
+}
+
+std::string format_msg_for_delivery_module(sw::redis::Redis* redis)
+{
+    std::string message = "1/";
+    message += *(redis->get("State_base_identifiant")) + "/" + *(redis->get("State_robot")) + "/" \
+    + *(redis->get("State_order")) + "/\n";
+    return message;
 }

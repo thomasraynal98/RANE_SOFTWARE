@@ -149,3 +149,15 @@ TARGET_LINK_LIBRARIES(prog_module_mng
     pthread
     hiredis
     /usr/local/lib/libserial.so)
+
+# PROGRAMME MODULE MANAGERS.
+ADD_EXECUTABLE(v2_prog_module
+software/v2_prog_module.cpp
+src/com_micro_lib.cpp 
+include/com_micro_lib.h)
+
+TARGET_LINK_LIBRARIES(v2_prog_module
+    redis++
+    pthread
+    hiredis
+    /usr/local/lib/libserial.so)
