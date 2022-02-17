@@ -136,3 +136,37 @@ std::string format_msg_for_delivery_module(sw::redis::Redis* redis)
     + *(redis->get("State_order")) + "/\n";
     return message;
 }
+
+void send_information_to_module(sw::redis::Redis* redis, LibSerial::SerialPort* connection)
+{
+    /*
+        msg description: 1/A/B/C/
+        A = State_base_identifiant "RANE_MK3_KODA_1"
+        B = State_robot "WAITING" "IN_DELIVERY" "REACH_DESTINATION"
+        C = State_order "OPEN" "CLOSE" "LOCK" "UNLOCK"
+    */
+
+    std::string message = "1/";
+    message += *(redis->get("State_base_identifiant")) + "/" + *(redis->get("State_robot")) + "/" \
+    + *(redis->get("State_order")) + "/\n";
+
+    connection->Write(message);
+}
+
+void read_module(sw::redis::Redis* redis, std::string msg)
+{
+    /*
+        msg description: 1/A
+        A = State_module_identifiant
+    */
+
+    std::string T;
+    std::stringstream X(msg);
+    
+    int i = 0;
+    while(std::getline(X, T, '/'))
+    {
+        if(i == 1) { redis->set("State_module_identifiant", T);}
+        i += 1;
+    }
+}

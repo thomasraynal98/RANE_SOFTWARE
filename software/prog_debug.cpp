@@ -45,7 +45,7 @@ int start(sw::redis::Redis* redis)
     redis->set("State_map_available", "true");
 
     redis->set("State_order", "NO_ORDER");
-    redis->set("State_connection_base", "NO_CONNECTION");
+    redis->set("State_connection_base", "DISCONNECTED");
     redis->set("State_robot", "WAITING");
     redis->set("State_module_identifiant", "XXXXXXXXXXXXX");
     redis->set("State_base_identifiant", "RANE_MK3_KODA_1");

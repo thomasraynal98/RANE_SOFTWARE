@@ -7,12 +7,12 @@ PROJECT(rane_software VERSION 1.0)
 INCLUDE_DIRECTORIES(include)
 
 # include Socket IO.
-include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/socket.io-client-cpp/CMakeLists.txt)
+#include(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/socket.io-client-cpp/CMakeLists.txt)
 
 # set good gcc version.
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -lredis++ -lhiredis -o CPUUsage")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -lredis++ -lhiredis -L/usr/local/lib -lserial -o CPUUsage")
 
 # found package.
 FIND_PACKAGE(OpenCV 4 REQUIRED)
@@ -75,19 +75,19 @@ TARGET_LINK_LIBRARIES(prog_com_microcontroler
     redis++
     pthread
     hiredis
-    /usr/local/lib/libserial.so)
+    serial)
 
-# PROGRAMME COMMUNICATION SERVER.
-ADD_EXECUTABLE(prog_com_server
-software/prog_com_server.cpp
-src/com_server_lib.cpp 
-include/com_server_lib.h)
+# # PROGRAMME COMMUNICATION SERVER.
+# ADD_EXECUTABLE(prog_com_server
+# software/prog_com_server.cpp
+# src/com_server_lib.cpp 
+# include/com_server_lib.h)
 
-TARGET_LINK_LIBRARIES(prog_com_server
-    redis++
-    pthread
-    hiredis
-    sioclient)
+# TARGET_LINK_LIBRARIES(prog_com_server
+#     redis++
+#     pthread
+#     hiredis
+#     sioclient)
 
 # PROGRAMME VSLAM.
 ADD_EXECUTABLE(prog_vslam
@@ -148,16 +148,4 @@ TARGET_LINK_LIBRARIES(prog_module_mng
     redis++
     pthread
     hiredis
-    /usr/local/lib/libserial.so)
-
-# PROGRAMME MODULE MANAGERS.
-ADD_EXECUTABLE(v2_prog_module
-software/v2_prog_module.cpp
-src/com_micro_lib.cpp 
-include/com_micro_lib.h)
-
-TARGET_LINK_LIBRARIES(v2_prog_module
-    redis++
-    pthread
-    hiredis
-    /usr/local/lib/libserial.so)
+    serial)

@@ -14,3 +14,5 @@ void inform_module(sw::redis::Redis* redis, std::ofstream &usbWrite);
 void get_module_information(sw::redis::Redis* redis, std::string msg);
 bool fileExists(const std::string& filename);
 std::string format_msg_for_delivery_module(sw::redis::Redis* redis);
+void send_information_to_module(sw::redis::Redis* redis, LibSerial::SerialPort* connection);
+void read_module(sw::redis::Redis* redis, std::string msg);

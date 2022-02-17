@@ -67,7 +67,14 @@
         "strstream": "cpp",
         "codecvt": "cpp",
         "cfenv": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "any": "cpp",
+        "bit": "cpp",
+        "forward_list": "cpp",
+        "source_location": "cpp",
+        "rope": "cpp",
+        "shared_mutex": "cpp",
+        "valarray": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }
