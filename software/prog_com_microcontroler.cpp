@@ -140,7 +140,7 @@ void function_thread_D()
     std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
     auto next = std::chrono::high_resolution_clock::now();
     //
-
+    
     while(true)
     {
         //
