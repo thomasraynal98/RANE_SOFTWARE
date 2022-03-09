@@ -173,4 +173,6 @@ int main()
 
     thread_lecture.join();
     thread_verification.join();
+
+    return 0;
 }

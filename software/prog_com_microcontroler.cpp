@@ -166,6 +166,7 @@ int main()
     // detect teensy port.
     connection = found_micro_port(1,true);
     std::cout << "FOUND CONNECTION:" << connection <<  std::endl;
+    
     // run thread.
     thread_A = std::thread(&function_thread_A);
     thread_B = std::thread(&function_thread_B, &sub);

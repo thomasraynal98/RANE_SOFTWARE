@@ -158,3 +158,13 @@ TARGET_LINK_LIBRARIES(manual_pilotage
     redis++
     pthread
     hiredis)
+
+# PROGRAMME MANUAL PILOTAGE.
+ADD_EXECUTABLE(prog_com_led
+software/prog_com_led.cpp)
+
+TARGET_LINK_LIBRARIES(prog_com_led
+    redis++
+    pthread
+    hiredis
+    serial)
