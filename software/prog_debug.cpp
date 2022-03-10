@@ -115,7 +115,7 @@ int main()
         std::cout << "State_module_identifiant=" << *redis.get("State_module_identifiant") << std::endl;
         std::cout << "State_base_identifiant=" << *redis.get("State_base_identifiant") << std::endl;
 
-        std::cout << "\nError_debug=" << *redis.get("nError_debug") << std::endl;
+        std::cout << "\nError_debug=" << *redis.get("Error_debug") << std::endl;
     }
 
     return 0;
