@@ -5,6 +5,9 @@
 #include <thread>
 #include <chrono>
 
+#include <stdio.h>
+#include <stdlib.h>
+
 using namespace sw::redis;
 auto redis = Redis("tcp://127.0.0.1:6379");
 std::thread thread_A;
@@ -35,27 +38,30 @@ void function_thread_A()
 
         std::string state_slamcore = *(redis.get("State_slamcore"));
 
-        if((state_slamcore.compare("LOST") == 0 || state_slamcore.compare("NOT_INITIALISED") == 0) && current_status != 1)
+        if(state_slamcore.compare("LOST") == 0 || state_slamcore.compare("NOT_INITIALISED") == 0)
         {
-            connection->Write("0/1/\n");
-            current_status = 1;
+            if(current_status != 1)
+            {
+                connection->Write("1/\n");
+                current_status = 1;
+            }
         }
         else
         {
             std::string robot_status = *(redis.get("State_robot"));
             if(robot_status.compare("WAITING") == 0 && current_status != 2)
             {
-                connection->Write("0/2/\n");
+                connection->Write("2/\n");
                 current_status = 2;
             }
             if(robot_status.compare("IN_DELIVERY") == 0 && current_status != 3)
             {
-                connection->Write("0/3/\n");
+                connection->Write("3/\n");
                 current_status = 3;
             }
             if(robot_status.compare("WAITING_FOR_CODE") == 0 && current_status != 4)
             {
-                connection->Write("0/4/\n");
+                connection->Write("4/\n");
                 current_status = 4;
             }
         }

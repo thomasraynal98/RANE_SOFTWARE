@@ -55,11 +55,13 @@ void compute_global_path(sw::redis::Redis* redis, cv::Mat* grid)
     {
         send_keypoint_global_path(redis, &keypoint_global_path);
         redis->set("State_need_compute_global_path", "false");
+        redis->set("State_robot", "IN_DELIVERY");
     }
     else
     {
         redis->set("State_global_path", "no_path");
         redis->set("State_need_compute_global_path", "error");
+        redis->set("State_robot", "WAITING");
     }
 }
 

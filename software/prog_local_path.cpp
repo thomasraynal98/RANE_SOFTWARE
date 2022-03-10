@@ -182,6 +182,7 @@ void function_thread_C()
             {
                 redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
                 redis.set("State_destination_is_reach", "true");
+                redis.set("State_robot", "WAITING_FOR_CODE");
             }
         }
     }

@@ -14,7 +14,7 @@ LibSerial::SerialPort* found_micro_port(int debug_mode, bool wait_option)
 {
     std::string message = "0/A\n";
 
-    for (int i=0; i<4; i++)
+    for (int i=1; i<4; i++)
     {
         LibSerial::SerialPort* serial_port = new LibSerial::SerialPort;
         std::string name_port = "/dev/ttyACM" + std::__cxx11::to_string(i);

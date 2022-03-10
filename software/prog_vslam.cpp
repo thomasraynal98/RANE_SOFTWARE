@@ -212,6 +212,7 @@ void function_thread_B()
 
 int main()
 {
+    redis.set("State_slamcore", "NOT_INITIALISED");
     auto sub = redis.subscriber();
     sub.on_message(callback_command);
     sub.subscribe("raw_data_encoder");
