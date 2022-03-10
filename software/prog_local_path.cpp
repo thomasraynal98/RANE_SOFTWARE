@@ -80,7 +80,7 @@ void function_thread_C()
     // THREAD DESCRIPTION: if it's good it's will compute command for autonomous mode.
 
     ///TIMER
-    int frequency = 10;
+    int frequency = 20;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     auto next = std::chrono::high_resolution_clock::now();
     ///END
@@ -130,11 +130,11 @@ void function_thread_C()
                     // Classic on site rotation.
                     if(command_type == -1)
                     {   //? ROTATION LEFT
-                        redis.publish("command_micro", "-1/0.15/-1/0.15/-1/0.15/1/0.15/1/0.15/1/0.15/");
+                        redis.publish("command_micro", "1/-1/0.15/-1/0.15/-1/0.15/1/0.15/1/0.15/1/0.15/");
                     }
                     else
                     {   //? ROTATION RIGHT
-                        redis.publish("command_micro", "1/0.15/1/0.15/1/0.15/-1/0.15/-1/0.15/-1/0.15/");
+                        redis.publish("command_micro", "1/1/0.15/1/0.15/1/0.15/-1/0.15/-1/0.15/-1/0.15/");
                     }
                 }
                 else
@@ -233,6 +233,7 @@ void function_thread_C()
                         if(left_destination.first == -1 && right_destination.first == -1)
                         {
                             new_dest = false;
+                            redis.set("Error_debug", "NO_NEW_DEST_FOUND");
                         }
                     }
                     else
@@ -294,7 +295,7 @@ void function_thread_C()
                         {
                             redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
                             redis.set("State_robot", "WAITING");
-                            redis.set("Error_debug", "LOCAL_A*_FAIL");
+                            // redis.set("Error_debug", "LOCAL_A*_FAIL");
                         }
                     }
                 }
