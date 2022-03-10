@@ -49,6 +49,8 @@ int start(sw::redis::Redis* redis)
     redis->set("State_robot", "WAITING");
     redis->set("State_module_identifiant", "XXXXXXXXXXXXX");
     redis->set("State_base_identifiant", "RANE_MK3_KODA_1");
+
+    redis->set("Error_debug", "NO_ERROR");
 }
 
 int main()
@@ -112,6 +114,8 @@ int main()
         std::cout << "State_robot=" << *redis.get("State_robot") << std::endl;
         std::cout << "State_module_identifiant=" << *redis.get("State_module_identifiant") << std::endl;
         std::cout << "State_base_identifiant=" << *redis.get("State_base_identifiant") << std::endl;
+
+        std::cout << "\nError_debug=" << *redis.get("nError_debug") << std::endl;
     }
 
     return 0;

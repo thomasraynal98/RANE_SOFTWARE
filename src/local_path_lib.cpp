@@ -1043,6 +1043,70 @@ void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP,
     redis->publish("command_micro", msg_command);
 }
 
+void compute_motor_autocommandeNico2(sw::redis::Redis* redis, Path_keypoint* TKP, Param_nav* navigation_param)
+{
+    /*
+        DESCRIPTION: http://faculty.salina.k-state.edu/tim/robot_prog/MobileBot/Steering/pointFwd.html
+    */
+
+    /* TODO : Reflechir à une maniere to integrate other variable in this calcule, 
+    like speed or area type. */
+    // TODO: influencer par distance de validation
+    const double V        = navigation_param->V;// desired velocity, u can make V depend on distance to target to slow down when close
+    const double K        = navigation_param->K;// turning gain [0.5:1]
+    double F              = navigation_param->F; // influence of straight line component
+    const int back_angle  = navigation_param->back_angle; // angle to consider that we are moving backwards in rad
+    const int stall_pwm   = navigation_param->stall_pwm;
+    const int unstall_pwm = navigation_param->unstall_pwm;
+
+    /* target_angle variable is good but is it between 0 and 180 degres.
+    We don't know if we need to go left or right so we recompute a version on target angle
+    between -180 and 180.*/
+    double alpha =  TKP->target_angle;
+
+    std::string msg_command = "1/";
+
+    std::cout << "[ALPHA:" << alpha << "]" << std::endl;
+    double rightspeed;
+    double leftspeed;
+
+    rightspeed = (double)(V*(F*cos(alpha)+K*sin(alpha)));
+    leftspeed  = (double)(V*(F*cos(alpha)-K*sin(alpha)));
+
+    // send to robot  
+    int direction;
+    if(leftspeed>0) {direction = 1;}
+    else {direction = -1;}
+    for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(leftspeed)) + "/";}
+    if(rightspeed>0) {direction = 1;}
+    else {direction = -1;}
+    for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(rightspeed)) + "/";}
+
+    redis->publish("command_micro", msg_command);
+}
+
+int is_on_site_rotation(double angle)
+{
+    /* DESCRIPTION: this function will check if the robot need to do a "on site" rotation. 
+    return 0 if not, -1 for left rotation, 1 for right rotation. */
+
+    int value_return = 0;
+
+    if(abs(angle)>M_PI_4+(40*M_PI/180))
+    {
+        if(angle > 0)
+        {
+            value_return = -1;
+        }
+        else
+        {
+            value_return = 1;
+        }
+    }
+
+    return value_return;
+}
+
 double get_length_path(std::vector<Pair>* local_path)
 {
     /*
@@ -1088,7 +1152,7 @@ bool security_break(std::vector<Pair>* data_lidar)
 void draw_invisible_map(cv::Mat* grid_G, cv::Mat* grid_C)
 {
     /*
-        DESCRIPTION: This function will write on cv::mat the part hide behind lidar point.
+        DESCRIPTION: This function will write on cv::mat grid_C the part hide behind lidar point.
     */
 
     std::vector<Pair> border;
@@ -1142,7 +1206,7 @@ void draw_invisible_map(cv::Mat* grid_G, cv::Mat* grid_C)
             for(double i = 79; i <= dest.first; i += (dest.first-79)/pas)
             {
                 int y = (int)(coef*(i-dest.first)+dest.second);
-                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(50), cv::FILLED, 0,0);
+                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(0), cv::FILLED, 0,0);
                 if(!is_blocked && (int)grid_G->at<uchar>((int)(y), (int)(i)) == 0) { is_blocked = true;}
             }
         }

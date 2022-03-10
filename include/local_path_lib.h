@@ -86,8 +86,10 @@ void select_target_keypoint_2(std::vector<Path_keypoint>* global_path_keypoint, 
 bool compute_new_TKP(cv::Mat* grid_RGB, std::vector<Pair>* projected_keypoint, std::vector<Pair>* data_lidar, cv::Mat* grid_gray, sw::redis::Redis* redis, Path_keypoint* TKP);
 void get_navigation_param(sw::redis::Redis* redis, Param_nav* navigation_param);
 void compute_motor_autocommandeNico(sw::redis::Redis* redis, Path_keypoint* TKP, int option, std::vector<double>* position, Param_nav* navigation_param, bool* LINEMODE);
+void compute_motor_autocommandeNico2(sw::redis::Redis* redis, Path_keypoint* TKP, Param_nav* navigation_param);
 bool security_break(std::vector<Pair>* data_lidar);
 double get_length_path(std::vector<Pair>* local_path);
 void draw_invisible_map(cv::Mat* grid, cv::Mat* gridB);
 int try_avoid_detector(cv::Mat* grid_G, std::vector<Pair>* local_path);
+int is_on_site_rotation(double angle);
 #endif

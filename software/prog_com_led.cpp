@@ -18,7 +18,7 @@ void function_thread_A()
     // THREAD DESCRIPTION: this thread listen REDIS
 
     //
-    int frequency       = 5;
+    int frequency       = 2;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
