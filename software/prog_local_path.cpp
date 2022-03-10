@@ -118,13 +118,44 @@ void function_thread_C()
                 // 4#. new LCDS.
                 double angle_ORIENTATION = 0; double angle_RKP = 0;
                 angle_ORIENTATION = position[2]; angle_RKP = compute_vector_RKP(target_keypoint.coordinate, position);
-                double alpha      = (angle_RKP - angle_ORIENTATION) * M_PI / 180; // difference in rad between robot angle and targetvector angle
-                alpha             += M_PI;
-                alpha             = atan2(sin(alpha), cos(alpha));                //[-PI:PI]
-                if(alpha > 0 && alpha < M_PI_2) alpha = M_PI - alpha;
-                else{ alpha = -(M_PI + alpha);}
+                int resultat = 0;
+                if(angle_ORIENTATION > angle_RKP)
+                {
+                    if(angle_ORIENTATION - angle_RKP > 180)
+                    {
+                        resultat = (360-angle_ORIENTATION) + angle_RKP;
+                    }
+                    else
+                    {
+                        resultat = -(angle_ORIENTATION - angle_RKP);
+                    }
+                }
+                else
+                {
+                    if(angle_RKP - angle_ORIENTATION > 180)
+                    {
+                        resultat = -(angle_ORIENTATION + (360-angle_RKP));
+                    }
+                    else
+                    {
+                        resultat = angle_RKP - angle_ORIENTATION;
+                    }
+                }
+                
+                if(false)
+                {
+                    for(auto kp : projected_keypoint)
+                    {
+                        cv::circle(clone, cv::Point((int)(kp.first),(int)(kp.second)),0, cv::Scalar(200), cv::FILLED, 0,0);
+                    }
+                    cv::circle(clone, cv::Point((int)(79),(int)(79)),0, cv::Scalar(50), cv::FILLED, 0,0);
+                    cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
+                    cv::resize(clone, clone, cv::Size(0,0),9.0,9.0,6);
+                    cv::imshow("Local_env_debug", clone);
+                    char d=(char)cv::waitKey(25);
+                }
 
-                int command_type = is_on_site_rotation(alpha);
+                int command_type = is_on_site_rotation(resultat);
                 if(command_type != 0)
                 {
                     // Classic on site rotation.
@@ -172,26 +203,29 @@ void function_thread_C()
                     // check if the fartest_PKP is in invisible zone.
                     // choose a new one if is in invisible zone.
                     Pair new_destination; bool new_dest = true;
+                    Pair left_destination; Pair right_destination;
                     if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(fartest_PKP.first)) == 0)
                     {   
                         // check the horizontal point left.
-                        Pair left_destination; left_destination.first = -1; left_destination.second = -1;
+                        left_destination.first = -1; left_destination.second = -1;
                         for(int i = (int)(fartest_PKP.first); i >= 0; i--)
                         {
                             if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
                             {
                                 left_destination.first = i;
                                 left_destination.second = (int)(fartest_PKP.second);
+                                i = -9999;
                             }
                         }
                         // check the horizontal point right.
-                        Pair right_destination; right_destination.first = -1; right_destination.second = -1;
+                        right_destination.first = -1; right_destination.second = -1;
                         for(int i = (int)(fartest_PKP.first); i <= 159; i++)
                         {
                             if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
                             {
                                 right_destination.first = i;
                                 right_destination.second = (int)(fartest_PKP.second);
+                                i = 9999;
                             }
                         }
 
@@ -211,7 +245,7 @@ void function_thread_C()
                             int dif_left  = (int)(fartest_PKP.first) - left_destination.first;
                             int dif_right = right_destination.first  - (int)(fartest_PKP.first);
 
-                            if(dif_left - dif_right < 20)
+                            if(abs(dif_left - dif_right) < 15)
                             {
                                 new_destination.first  = right_destination.first;
                                 new_destination.second = right_destination.second;
@@ -252,6 +286,23 @@ void function_thread_C()
 
                     if(result_astar)
                     {
+                        if(true)
+                        {
+                            for(auto pt : local_path)
+                            {
+                                cv::circle(clone_gray_invisible, cv::Point((int)(pt.first),(int)(pt.second)),0, cv::Scalar(150), cv::FILLED, 0,0);
+                            }
+
+                            cv::circle(clone_gray_invisible, cv::Point((int)(left_destination.first),(int)(left_destination.second)),1, cv::Scalar(70), cv::FILLED, 0,0);
+                            cv::circle(clone_gray_invisible, cv::Point((int)(right_destination.first),(int)(right_destination.second)),1, cv::Scalar(70), cv::FILLED, 0,0);
+
+                            cv::circle(clone_gray_invisible, cv::Point((int)(fartest_PKP.first),(int)(fartest_PKP.second)),1, cv::Scalar(220), cv::FILLED, 0,0);
+                            cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
+                            cv::resize(clone_gray_invisible, clone_gray_invisible, cv::Size(0,0),9.0,9.0,6);
+                            cv::imshow("Local_env_debug", clone_gray_invisible);
+                            char d=(char)cv::waitKey(25);
+                        }
+
                         redis.set("Error_debug", "NO_ERROR");
 
                         // select point for angle choose.
@@ -295,7 +346,7 @@ void function_thread_C()
                         {
                             redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
                             redis.set("State_robot", "WAITING");
-                            // redis.set("Error_debug", "LOCAL_A*_FAIL");
+                            redis.set("Error_debug", "LOCAL_A*_FAIL");
                         }
                     }
                 }
@@ -314,107 +365,6 @@ void function_thread_C()
             redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
         }
     }
-
-    //? ORIGINAL CODE (DOWN) //////////////////////////////////
-    // while(true)
-    // {
-    //     ///TIMER///////////////////////////////////////////////////////////////////
-    //     next                       += std::chrono::milliseconds((int)time_of_loop);
-    //     std::this_thread::sleep_until(next);
-    //     next = std::chrono::high_resolution_clock::now();
-    //     ///END/////////////////////////////////////////////////////////////////////
-
-    //     // if(debug_mode)
-    //     // {   
-    //     //     cv::Mat clone = grid_RGB_1.clone();
-    //     //     show_local_environnement(&clone, &lidar_data, &current_speed);
-    //     // }
-
-    //     cv::Mat cloned = grid_RGB_2.clone();
-    //     cv::Mat clonedg = grid_Gray_2.clone();
-
-    //     bool LINEMODE;
-    //     LINEMODE = true;
-
-    //     std::vector<Pair> FDP;
-    //     compute_new_TKP(&cloned, &FDP, &lidar_data, \
-    //             &clonedg, &redis, &target_keypoint);
-
-    //     // A#. update keypoint path information.
-    //     if(!global_path.empty())
-    //     {
-    //         update_data(&redis, &global_path, &position);
-
-    //         // B#. detect if we are arrived && if the global path is not computing.
-    //         if(!destination_reach(&global_path.back(), position) && \
-    //         (*(redis.get("State_global_path_is_computing"))).compare("false") == 0 && \
-    //         (*(redis.get("State_destination_is_reach"))).compare("false") == 0 && \
-    //         (*(redis.get("State_is_autonomous"))).compare("true") == 0 && \
-    //         (*(redis.get("State_slamcore"))).compare("OK") == 0)
-    //         {
-    //             // 1#. compute the classic target keypoint.
-    //             select_target_keypoint_2(&global_path, &target_keypoint);
-
-    //             // 2#. project global path keypoint into the current local lidar map.
-    //             std::vector<Pair> projected_keypoint; 
-    //             project_keypoint_in_lidar_referencial(&global_path, &position, &target_keypoint, &projected_keypoint);
-
-    //             // 3#. write lidar sample on clone cv::mat.
-    //             cv::Mat clone = grid_RGB_2.clone();
-    //             draw_lidar_data(&clone, &target_keypoint, &lidar_data);
-
-    //             // 4#. compute a new TKP based on LCDS.
-    //             cv::Mat clone_gray = grid_Gray_2.clone();
-    //             if(compute_new_TKP(&clone, &projected_keypoint, &lidar_data, \
-    //             &clone_gray, &redis, &target_keypoint))
-    //             {
-    //                 compute_motor_autocommandeNico(&redis, &target_keypoint, 1, \
-    //                 &position, &navigation_param, &LINEMODE);
-    //             }
-    //             else
-    //             {
-    //                 //! This mean that no Global path KP could be projected in LCDS.
-    //                 // Check if we destination is blocked du to drift.
-    //                 if(target_keypoint.distance_KPD < 3.0)
-    //                 {
-    //                     if(destination_is_blocked)
-    //                     {
-    //                         redis.set("State_destination_is_reach", "true");
-    //                         destination_is_blocked = false;
-    //                     }
-    //                     else
-    //                     {
-    //                         std::cout << "[DEBUG: destination is blocked]" <<  \
-    //                         target_keypoint.distance_KPD << std::endl;
-    //                         destination_is_blocked = true;
-    //                         next += std::chrono::milliseconds((int)1500);
-    //                         std::this_thread::sleep_until(next);
-    //                     }
-    //                 }
-    //                 else
-    //                 {
-    //                     // This case occurend when the robot is not in the good rotation.
-    //                     compute_motor_autocommandeNico(&redis, &target_keypoint, 0, \
-    //                     &position, &navigation_param, &LINEMODE);
-    //                 }
-    //             }
-
-    //             // 5#. security stop, if lidar data is on 20 cm trajector
-    //             if(security_break(&lidar_data))
-    //             {
-    //                 redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
-    //                 next += std::chrono::milliseconds((int)1000);
-    //                 std::this_thread::sleep_until(next);
-    //             }
-    //         }
-    //         else
-    //         {
-    //             redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
-    //             redis.set("State_destination_is_reach", "true");
-    //             redis.set("State_robot", "WAITING_FOR_CODE");
-    //         }
-    //     }
-    // }
 }
 
 void callback_command(std::string channel, std::string msg)

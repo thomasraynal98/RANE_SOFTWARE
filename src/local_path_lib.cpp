@@ -1085,22 +1085,22 @@ void compute_motor_autocommandeNico2(sw::redis::Redis* redis, Path_keypoint* TKP
     redis->publish("command_micro", msg_command);
 }
 
-int is_on_site_rotation(double angle)
+int is_on_site_rotation(int angle)
 {
     /* DESCRIPTION: this function will check if the robot need to do a "on site" rotation. 
     return 0 if not, -1 for left rotation, 1 for right rotation. */
 
     int value_return = 0;
 
-    if(abs(angle)>M_PI_4+(40*M_PI/180))
+    if(abs(angle)>80)
     {
         if(angle > 0)
         {
-            value_return = -1;
+            value_return = 1;
         }
         else
         {
-            value_return = 1;
+            value_return = -1;
         }
     }
 
@@ -1189,7 +1189,7 @@ void draw_invisible_map(cv::Mat* grid_G, cv::Mat* grid_C)
             for(double i = 79; i >= dest.first; i -= (79-dest.first)/pas)
             {
                 double y = (coef*(i-dest.first)+dest.second);
-                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(50), cv::FILLED, 0,0);
+                if(is_blocked) cv::circle(*grid_C, cv::Point((int)(i),(int)(y)), size_point, cv::Scalar(0), cv::FILLED, 0,0);
                 if(!is_blocked && (int)grid_G->at<uchar>((int)(y), (int)(i)) == 0) { is_blocked = true;}
             }
         }

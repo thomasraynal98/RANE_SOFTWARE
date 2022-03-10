@@ -91,5 +91,5 @@ bool security_break(std::vector<Pair>* data_lidar);
 double get_length_path(std::vector<Pair>* local_path);
 void draw_invisible_map(cv::Mat* grid, cv::Mat* gridB);
 int try_avoid_detector(cv::Mat* grid_G, std::vector<Pair>* local_path);
-int is_on_site_rotation(double angle);
+int is_on_site_rotation(int angle);
 #endif
