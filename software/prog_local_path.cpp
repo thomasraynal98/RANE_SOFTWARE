@@ -186,14 +186,14 @@ void function_thread_C()
                     cv::Mat clone_gray_invisible = clone_gray.clone();
                     draw_invisible_map(&clone_gray, &clone_gray_invisible);
 
-                    bool FKP_is_to_close = false;
+                    bool FKP_is_to_close = false; bool new_dest = true;
                     double distance_max_max = 9999;
                     Pair new_destination; new_destination.first = -1; new_destination.second = -1;
-                    bool new_dest = true;
                     Pair left_destination; Pair right_destination; Pair fartest_PKP;
 
-                    while(!FKP_is_to_close || new_destination.first != -1)
+                    while(!FKP_is_to_close)
                     {
+                        new_dest = true;
                         // Get the fartest keypoint on the projected map.
                         double distance_max = 0;
                         for(int i = 0; i < projected_keypoint.size(); i++)
@@ -208,7 +208,7 @@ void function_thread_C()
                         }
 
                         distance_max_max = distance_max;
-                        if(distance_max_max < 1.5) FKP_is_to_close = true;
+                        if(distance_max_max < 15) FKP_is_to_close = true;
 
                         // check if the fartest_PKP is in invisible zone.
                         // choose a new one if is in invisible zone.
@@ -283,6 +283,8 @@ void function_thread_C()
                             new_destination.first  = fartest_PKP.first;
                             new_destination.second = fartest_PKP.second;
                         }
+
+                        if(new_destination.first != -1) FKP_is_to_close = true; // Just for leave.
                     }
 
                     // compute A* with this new destination.
@@ -293,17 +295,23 @@ void function_thread_C()
                         result_astar = aStarSearch(clone_gray_invisible, current_position, new_destination, &redis, 1, &local_path);
                     }
 
-                    if(result_astar)
-                    {
-                        if(true)
+                    if(true)
                         {
+                            for(auto pt : projected_keypoint)
+                            {
+                                cv::circle(clone_gray_invisible, cv::Point((int)(pt.first),(int)(pt.second)),0, cv::Scalar(150), cv::FILLED, 0,0);
+                            }
                             for(auto pt : local_path)
                             {
                                 cv::circle(clone_gray_invisible, cv::Point((int)(pt.first),(int)(pt.second)),0, cv::Scalar(150), cv::FILLED, 0,0);
                             }
+                            for(auto pt : lidar_data)
+                            {
+                                cv::circle(clone_gray_invisible, cv::Point((int)(pt.first),(int)(pt.second)),0, cv::Scalar(100), cv::FILLED, 0,0);
+                            }
 
-                            cv::circle(clone_gray_invisible, cv::Point((int)(left_destination.first),(int)(left_destination.second)),1, cv::Scalar(70), cv::FILLED, 0,0);
-                            cv::circle(clone_gray_invisible, cv::Point((int)(right_destination.first),(int)(right_destination.second)),1, cv::Scalar(70), cv::FILLED, 0,0);
+                            cv::circle(clone_gray_invisible, cv::Point((int)(left_destination.first),(int)(left_destination.second)),1, cv::Scalar(50), cv::FILLED, 0,0);
+                            cv::circle(clone_gray_invisible, cv::Point((int)(right_destination.first),(int)(right_destination.second)),1, cv::Scalar(50), cv::FILLED, 0,0);
 
                             cv::circle(clone_gray_invisible, cv::Point((int)(fartest_PKP.first),(int)(fartest_PKP.second)),1, cv::Scalar(220), cv::FILLED, 0,0);
                             cv::namedWindow("Local_env_debug",cv::WINDOW_AUTOSIZE);
@@ -312,6 +320,8 @@ void function_thread_C()
                             char d=(char)cv::waitKey(25);
                         }
 
+                    if(result_astar)
+                    {
                         redis.set("Error_debug", "NO_ERROR");
 
                         // select point for angle choose.
