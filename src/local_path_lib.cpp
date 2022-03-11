@@ -1092,7 +1092,7 @@ int is_on_site_rotation(int angle)
 
     int value_return = 0;
 
-    if(abs(angle)>80)
+    if(abs(angle)>100)
     {
         if(angle > 0)
         {

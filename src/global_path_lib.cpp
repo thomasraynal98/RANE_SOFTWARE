@@ -223,6 +223,16 @@ bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, i
 
                         if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 255)
 						    {fNew = cellDetails[i][j].f + 1.0;}
+
+                        //! NEW ONE (for dirty pixel)
+                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) != 0 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 50 && \
+                        (int)grid.at<uchar>(neighbour.second, neighbour.first) != 120 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 200 && \
+                        (int)grid.at<uchar>(neighbour.second, neighbour.first) != 255 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 75)
+						    {fNew = cellDetails[i][j].f + 1.0;}
+                        //! NEW ONE (highway)
+                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 75)
+						    {fNew = cellDetails[i][j].f + 0.2;}
+
                         if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 200)
 						    {fNew = cellDetails[i][j].f + 6.0;} // IMPORTANT VALUE.
 
@@ -298,7 +308,12 @@ bool isUnBlocked(cv::Mat grid, const Pair& point)
 	// Returns true if the cell is not blocked else false
     // std::cout << ">> " << point.first << ", " << point.second << "\n";
     // std::cout << ">> " << int(grid.at<uchar>(point.second, point.first)) << "\n";
-	return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) == 255) || (grid.at<uchar>(point.second,point.first) == 200));
+
+    //! ORIGINAL
+	// return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) == 255) || (grid.at<uchar>(point.second,point.first) == 200));
+
+    //! NEW ONE
+    return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) != 0) && (grid.at<uchar>(point.second,point.first) != 50) && (grid.at<uchar>(point.second,point.first) != 120));
 }
 
 bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src)

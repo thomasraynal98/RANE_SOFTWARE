@@ -186,94 +186,103 @@ void function_thread_C()
                     cv::Mat clone_gray_invisible = clone_gray.clone();
                     draw_invisible_map(&clone_gray, &clone_gray_invisible);
 
-                    // Get the fartest keypoint on the projected map.
-                    Pair fartest_PKP;
-                    double distance_max = 0;
-                    for(int i = 0; i < projected_keypoint.size(); i++)
+                    bool FKP_is_to_close = false;
+                    double distance_max_max = 9999;
+                    Pair new_destination; new_destination.first = -1; new_destination.second = -1;
+                    bool new_dest = true;
+                    Pair left_destination; Pair right_destination; Pair fartest_PKP;
+
+                    while(!FKP_is_to_close || new_destination.first != -1)
                     {
-                        double distance = sqrt(pow(79-projected_keypoint[i].first,2)+pow(79-projected_keypoint[i].second,2));
-                        if(distance > distance_max)
+                        // Get the fartest keypoint on the projected map.
+                        double distance_max = 0;
+                        for(int i = 0; i < projected_keypoint.size(); i++)
                         {
-                            distance_max = distance;
-                            fartest_PKP.first  = projected_keypoint[i].first;
-                            fartest_PKP.second = projected_keypoint[i].second;
-                        }
-                    }
-
-                    // check if the fartest_PKP is in invisible zone.
-                    // choose a new one if is in invisible zone.
-                    Pair new_destination; bool new_dest = true;
-                    Pair left_destination; Pair right_destination;
-                    if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(fartest_PKP.first)) == 0)
-                    {   
-                        // check the horizontal point left.
-                        left_destination.first = -1; left_destination.second = -1;
-                        for(int i = (int)(fartest_PKP.first); i >= 0; i--)
-                        {
-                            if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
+                            double distance = sqrt(pow(79-projected_keypoint[i].first,2)+pow(79-projected_keypoint[i].second,2));
+                            if(distance > distance_max && distance < distance_max_max)
                             {
-                                left_destination.first = i;
-                                left_destination.second = (int)(fartest_PKP.second);
-                                i = -9999;
-                            }
-                        }
-                        // check the horizontal point right.
-                        right_destination.first = -1; right_destination.second = -1;
-                        for(int i = (int)(fartest_PKP.first); i <= 159; i++)
-                        {
-                            if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
-                            {
-                                right_destination.first = i;
-                                right_destination.second = (int)(fartest_PKP.second);
-                                i = 9999;
+                                distance_max = distance;
+                                fartest_PKP.first  = projected_keypoint[i].first;
+                                fartest_PKP.second = projected_keypoint[i].second;
                             }
                         }
 
-                        // choose the new_destination.
-                        if(left_destination.first != -1)
-                        {
-                            new_destination.first  = left_destination.first;
-                            new_destination.second = left_destination.second;
-                        }
-                        if(right_destination.first != -1)
-                        {
-                            new_destination.first  = right_destination.first;
-                            new_destination.second = right_destination.second;  
-                        }
-                        if(left_destination.first != -1 && right_destination.first != -1)
-                        {
-                            int dif_left  = (int)(fartest_PKP.first) - left_destination.first;
-                            int dif_right = right_destination.first  - (int)(fartest_PKP.first);
+                        distance_max_max = distance_max;
+                        if(distance_max_max < 1.5) FKP_is_to_close = true;
 
-                            if(abs(dif_left - dif_right) < 15)
+                        // check if the fartest_PKP is in invisible zone.
+                        // choose a new one if is in invisible zone.
+                        if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(fartest_PKP.first)) == 0)
+                        {   
+                            // check the horizontal point left.
+                            left_destination.first = -1; left_destination.second = -1;
+                            for(int i = (int)(fartest_PKP.first); i >= 0; i--)
+                            {
+                                if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
+                                {
+                                    left_destination.first = i;
+                                    left_destination.second = (int)(fartest_PKP.second);
+                                    i = -9999;
+                                }
+                            }
+                            // check the horizontal point right.
+                            right_destination.first = -1; right_destination.second = -1;
+                            for(int i = (int)(fartest_PKP.first); i <= 159; i++)
+                            {
+                                if((int)clone_gray_invisible.at<uchar>((int)(fartest_PKP.second), (int)(i)) != 0)
+                                {
+                                    right_destination.first = i;
+                                    right_destination.second = (int)(fartest_PKP.second);
+                                    i = 9999;
+                                }
+                            }
+
+                            // choose the new_destination.
+                            if(left_destination.first != -1)
+                            {
+                                new_destination.first  = left_destination.first;
+                                new_destination.second = left_destination.second;
+                            }
+                            if(right_destination.first != -1)
                             {
                                 new_destination.first  = right_destination.first;
-                                new_destination.second = right_destination.second;
+                                new_destination.second = right_destination.second;  
                             }
-                            else
+                            if(left_destination.first != -1 && right_destination.first != -1)
                             {
-                                if(dif_left > dif_right)
+                                int dif_left  = (int)(fartest_PKP.first) - left_destination.first;
+                                int dif_right = right_destination.first  - (int)(fartest_PKP.first);
+
+                                if(abs(dif_left - dif_right) < 15)
                                 {
                                     new_destination.first  = right_destination.first;
-                                    new_destination.second = right_destination.second;   
+                                    new_destination.second = right_destination.second;
                                 }
                                 else
                                 {
-                                    new_destination.first  = left_destination.first;
-                                    new_destination.second = left_destination.second;  
+                                    if(dif_left > dif_right)
+                                    {
+                                        new_destination.first  = right_destination.first;
+                                        new_destination.second = right_destination.second;   
+                                    }
+                                    else
+                                    {
+                                        new_destination.first  = left_destination.first;
+                                        new_destination.second = left_destination.second;  
+                                    }
                                 }
                             }
+                            if(left_destination.first == -1 && right_destination.first == -1)
+                            {
+                                new_dest = false;
+                                redis.set("Error_debug", "NO_NEW_DEST_FOUND");
+                            }
                         }
-                        if(left_destination.first == -1 && right_destination.first == -1)
+                        else
                         {
-                            new_dest = false;
-                            redis.set("Error_debug", "NO_NEW_DEST_FOUND");
+                            new_destination.first  = fartest_PKP.first;
+                            new_destination.second = fartest_PKP.second;
                         }
-                    }
-                    else
-                    {
-                        new_destination.first  = fartest_PKP.first;
-                        new_destination.second = fartest_PKP.second;
                     }
 
                     // compute A* with this new destination.
@@ -306,10 +315,10 @@ void function_thread_C()
                         redis.set("Error_debug", "NO_ERROR");
 
                         // select point for angle choose.
-                        if(local_path.size() > 8) 
+                        if(local_path.size() > 6) 
                         { 
-                            target_keypoint.coordinate.first  = local_path[8].first;
-                            target_keypoint.coordinate.second = local_path[8].second;
+                            target_keypoint.coordinate.first  = local_path[6].first;
+                            target_keypoint.coordinate.second = local_path[6].second;
                         }
                         else
                         {
