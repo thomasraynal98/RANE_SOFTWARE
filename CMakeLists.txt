@@ -31,7 +31,8 @@ ADD_EXECUTABLE(exempleA
 TARGET_LINK_LIBRARIES(exempleA
     redis++
     pthread
-    hiredis)
+    hiredis
+    ${OpenCV_LIBS})
 
 ADD_EXECUTABLE(exempleB
     software/exempleB.cpp)
@@ -168,3 +169,15 @@ TARGET_LINK_LIBRARIES(prog_com_led
     pthread
     hiredis
     serial)
+
+# PROGRAMME NEW LOCAL COMPREHENSION AND DESCISION SYSTEM. (REFONTE)
+ADD_EXECUTABLE(LocalCDS
+software/new_LCDS.cpp
+src/LCDS_lib.cpp 
+software/new_LCDS.cpp)
+
+TARGET_LINK_LIBRARIES(LocalCDS
+    redis++
+    pthread
+    hiredis
+    ${OpenCV_LIBS})

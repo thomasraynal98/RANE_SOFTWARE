@@ -33,6 +33,7 @@ int start(sw::redis::Redis* redis)
 
     redis->set("State_slamcore", init);
     redis->set("State_robot_position", init);
+    redis->set("State_robot_position_center", init);
     redis->set("State_robot_position_png", init);
     redis->set("State_robot_speed", init);
     redis->set("State_global_path_is_computing", "false");
@@ -98,6 +99,7 @@ int main()
 
         std::cout << "State_slamcore=" << *redis.get("State_slamcore") << std::endl;
         std::cout << "State_robot_position=" << *redis.get("State_robot_position") << std::endl;
+        std::cout << "State_robot_position_center=" << *redis.get("State_robot_position_center") << std::endl;
         std::cout << "State_robot_position_png=" << *redis.get("State_robot_position_png") << std::endl;
         std::cout << "State_robot_speed=" << *redis.get("State_robot_speed") << std::endl;
         std::cout << "State_global_path_is_computing=" << *redis.get("State_global_path_is_computing") << std::endl;
