@@ -141,3 +141,10 @@ double compute_distance_RKP(Robot_complete_position* position_robot, Pixel_posit
 double compute_angle_RKP_onLCDS(Robot_complete_position* position_robot, Pixel_position* KP);
 double deg_to_rad(double deg);
 double rad_to_deg(double rad);
+void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lidar_sample>* lidarWindows, std::vector<Pixel_position>* LW_onLCDS, cv::Mat* LCDS_color);
+double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
+
+//TODO: DEBUG FONCTION.
+void debug_data();
+void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS);
+void debug_add_robotShape(cv::Mat* LCDS_color);

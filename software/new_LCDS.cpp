@@ -101,6 +101,10 @@ void function_thread_LCDS()
     std::vector<Pixel_position> GPKP_onLCDS;
     GPKP_onLCDS.reserve(GPKP.capacity());
     setup_new_GPKP(&GPKP_onLCDS); //! name of this function is not pertinant but function is.
+    
+    std::vector<Pixel_position> LW_onLCDS;
+    LW_onLCDS.reserve(360*lidarWindows_size);
+    setup_new_GPKP(&LW_onLCDS); //! name of this function is not pertinant but function is.
 
     while(true)
     {
@@ -115,6 +119,9 @@ void function_thread_LCDS()
 
             // Create vector of projected GPKP on LCDS.
             project_GPKP_onLCDS(&LCDS_color, &GPKP, &GPKP_notYetReached_b, &GPKP_onLCDS, &position_robot);
+
+            // Project LidarWindows on LCDS.
+            project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_color);
 
             //! check if we reach the target.
         }
@@ -149,7 +156,7 @@ int main()
     thread_B = std::thread(&function_thread_redisData);
     thread_C = std::thread(&function_thread_LCDS);
     thread_A.join();
-    thread_B.join() ;
+    thread_B.join();
     thread_C.join();
     return 0;
 }
