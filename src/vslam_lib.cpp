@@ -64,6 +64,11 @@ void send_pose_information(sw::redis::Redis* redis, const slamcore::Map2DInterfa
 
     message_position += std::to_string(x) + "/" + std::to_string(y) + "/" + std::to_string(z) + "/" + std::to_string(r) + "/" + std::to_string(p) + "/" + std::to_string(yaw) + "/";
     redis->set("State_robot_position", message_position);
+
+    // Compute State_robot_position_center.
+    double cam_to_center = std::stod(*(redis->get("Param_robot_length")))/2;
+    message_position = std::to_string(x + sin(M_PI-yaw)*cam_to_center) + "/" + std::to_string(y + cos(M_PI-yaw)*cam_to_center) + "/0/0/0/0/";
+    redis->set("State_robot_position_center", message_position);
     
     // convert for the pixel grid camera position.
     int i = cellCoordinates.x;
@@ -71,7 +76,6 @@ void send_pose_information(sw::redis::Redis* redis, const slamcore::Map2DInterfa
     message_position = std::to_string(i) + "/" + std::to_string(map.getHeight() -j) + "/";
 
     // convert for the pixel grid center robot position.
-    double cam_to_center = std::stod(*(redis->get("Param_robot_length")));
     const slamcore::Vector mapPoint2(x + sin(M_PI-yaw)*cam_to_center, y + cos(M_PI-yaw)*cam_to_center);
     if(slamcore::pointWithinMap(map, mapPoint2))
     {

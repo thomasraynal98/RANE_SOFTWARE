@@ -21,7 +21,7 @@ using namespace sw::redis;
 
 //! VARIABLE PARAM.
 double max_m_dist = 200;
-int lidarWindows_size = 50;
+int lidarWindows_size = 5;
 double LCDS_resolution = 0.05;
 double m_LCDS_width    = 8.0;
 double m_LCDS_height   = 4.0;
@@ -97,7 +97,10 @@ void function_thread_LCDS()
     //TODO: 2. An LCDS process is run when we are in Autonomous mode, and the GPKP is processed.
     //TODO: 3. AN LCDS process is run if we are not reach the destination yet.
 
-    std::vector<bool> GPKP_notYetReached_b(GPKP.capacity());
+    std::vector<bool> GPKP_notYetReached_b;
+    GPKP_notYetReached_b.reserve(GPKP.capacity());
+    setup_new_GPKP_notYetReached_b(&GPKP_notYetReached_b);
+
     std::vector<Pixel_position> GPKP_onLCDS;
     GPKP_onLCDS.reserve(GPKP.capacity());
     setup_new_GPKP(&GPKP_onLCDS); //! name of this function is not pertinant but function is.
@@ -122,6 +125,8 @@ void function_thread_LCDS()
 
             // Project LidarWindows on LCDS.
             project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_color);
+            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS);
+
 
             //! check if we reach the target.
         }

@@ -12,6 +12,15 @@ void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample)
     }
 }
 
+void setup_new_GPKP_notYetReached_b(std::vector<bool>* GPKP_notYetReached_b)
+{
+    bool setup_model = false;
+    for(int idx = 0; idx < GPKP_notYetReached_b->capacity(); idx++)
+    {
+        GPKP_notYetReached_b->push_back(setup_model);
+    }
+}
+
 void get_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample, std::string raw_lidar_sample)
 {
     //TODO:    DESCRIPTION: Cette fonction va recuperer le nouveau jeu de données provenant du lidar.
@@ -31,8 +40,8 @@ void get_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample, std::string
     int i = 0;
     while(std::getline(X, T, ','))
     {
-        if(i % 2 == 0) new_lidar_sample->at((int)i/2).value = std::stod(T);
-        if(i % 2 == 1) new_lidar_sample->at((int)i/2).angle = std::stod(T);
+        if(i % 2 == 0) new_lidar_sample->at((int)i/2).angle = std::stod(T);
+        if(i % 2 == 1) new_lidar_sample->at((int)i/2).value = std::stod(T);
         i += 1;
     }
 }
@@ -92,9 +101,11 @@ void setup_lidarWindows(std::vector<Lidar_sample>* lidarWindows)
 
     // 1. Reset vector.
     Robot_position_transformation reset_model;
+    Lidar_sample reset_sample_model;
 
     for(int idx = 0; idx < lidarWindows->capacity(); idx++)
     {
+        lidarWindows->push_back(reset_sample_model);
         lidarWindows->at(idx).viewpoint = reset_model;
         lidarWindows->at(idx).observation.reserve(360);
         setup_new_lidar_sample(&lidarWindows->at(idx).observation);
@@ -207,7 +218,7 @@ bool is_new_position_detected(Robot_complete_position* position_robot, sw::redis
         }
         if(i == 2) 
         {
-            redis_output_position.p_center.idx_row = std::stoi(T);
+            redis_output_position.p_center.idx_col = std::stoi(T);
         }
         if(i == 3) 
         {
@@ -238,7 +249,7 @@ void filter_GPKP(Robot_complete_position* position_robot, std::vector<Pixel_posi
 
     // 2. Found the index of nearest KP.
     double distance_min = 9999; int idx_min = -1;
-    double new_distance;
+    double new_distance = -1;
     for(int idx = 0; idx < GPKP->capacity(); idx++)
     {
         new_distance = distance_btw_pixel(position_robot->p_center, GPKP->at(idx), 0.05);
@@ -254,6 +265,7 @@ void filter_GPKP(Robot_complete_position* position_robot, std::vector<Pixel_posi
     if(start >= GPKP_notYetReached_b->capacity()) start = idx_min;
     for(int idx = start + 1; idx < GPKP_notYetReached_b->capacity(); idx++)
     {
+        if(GPKP->at(idx).idx_col == -1) break;
         GPKP_notYetReached_b->at(idx) = true;
     }
 }
@@ -272,7 +284,7 @@ void project_GPKP_onLCDS(cv::Mat* LCDS_color, std::vector<Pixel_position>* GPKP,
     double col_PKP = -1; double row_PKP = -1;
     double windows_col = LCDS_color->cols;
     double windows_row = LCDS_color->rows;
-    double m_LCDS_demi_width = LCDS_color->cols * 0.05;
+    double m_LCDS_demi_width = LCDS_color->cols * 0.05 / 2;
 
     // 1. Clean vector GPKP_onLCDS.
     Pixel_position reset_model(-1,-1);
@@ -291,14 +303,14 @@ void project_GPKP_onLCDS(cv::Mat* LCDS_color, std::vector<Pixel_position>* GPKP,
             // 4. Project KP in LCDS.
             //! We can project the KP even if they are behind the robot.
             //TODO: check if windows_col and windows_row are in the good direction.
-            //TODO: FORMULE = sin(angle_RKP) * distance_RKP * px_Width_Windows / m_demi_Width_Windows + px_Height_Windows ?
+            //TODO: FORMULE = sin(180-angle_RKP) * distance_RKP * px_Width_Windows/2 / m_demi_Width_Windows + px_Height_Windows ?
             col_PKP = row_PKP = -1;
-            col_PKP = sin(deg_to_rad(angle_RKP_onLCDS))*distance_RKP*windows_col/m_LCDS_demi_width+windows_row;
-            row_PKP = cos(deg_to_rad(angle_RKP_onLCDS))*distance_RKP*windows_col/m_LCDS_demi_width+windows_row;
+            col_PKP = sin(deg_to_rad(180-angle_RKP_onLCDS))*distance_RKP*(windows_row/2)/m_LCDS_demi_width+(windows_col/2);
+            row_PKP = cos(deg_to_rad(180-angle_RKP_onLCDS))*distance_RKP*(windows_row/2)/m_LCDS_demi_width+(windows_col/2);
 
             // 5. Check if this PKP can fit in windows.
             if(col_PKP >= 0 && col_PKP < windows_col && row_PKP >= 0 && row_PKP < windows_row)
-            {
+            {   
                 GPKP_onLCDS->at(counter_PKP).idx_col = col_PKP;
                 GPKP_onLCDS->at(counter_PKP).idx_row = row_PKP;
                 counter_PKP += 1;
@@ -374,7 +386,7 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
     // 0. Setup variable.
     double windows_col = LCDS_color->cols;
     double windows_row = LCDS_color->rows;
-    double m_LCDS_demi_width = LCDS_color->cols * 0.05;
+    double m_LCDS_demi_width = LCDS_color->cols * 0.05 / 2;
 
     // 1. Reset les valeurs de LW_onLCDS.
     Pixel_position reset_model(-1,-1);
@@ -398,8 +410,16 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
 
             // 5. Update rotation.
             lidarWindows->at(idx).viewpoint.detal_yaw_deg = compute_angle_btw_angle(position_robot->yaw_deg_cam, lidarWindows->at(idx).viewpoint.yaw_deg);
+
+            //?? 6. Filter data of mouvement.
+            //?? L'idée est de lisser le mouvements de déplacement.
+
+            //??
+            std::cout << lidarWindows->at(idx).viewpoint.delta_x << " " << lidarWindows->at(idx).viewpoint.delta_y << " " << lidarWindows->at(idx).viewpoint.detal_yaw_deg << std::endl;
         }
     }
+    //??
+    std::cout << std::endl;
 
     // 6. Project chaque sample dans la LCDS.
     int counter_lidar_data = 0; int col_lidar_data = -1; double row_lidar_data = -1;
@@ -416,8 +436,8 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
 
                 //! Verification de FORMULE obligatoire. Notament col<>row, et x<>y.
                 //! Le +6.0 correspond au faite que lidar est situé 30 cm en avant du centre du robot.
-                col_lidar_data = (int)sin(lidarWindows->at(idx_sample).observation[idx_data].angle + deg_to_rad(lidarWindows->at(idx_sample).viewpoint.detal_yaw_deg))*((windows_col/2)+lidarWindows->at(idx_sample).viewpoint.delta_y)/m_LCDS_demi_width+windows_row+lidarWindows->at(idx_sample).viewpoint.delta_x+6.0; 
-                row_lidar_data = (int)cos(lidarWindows->at(idx_sample).observation[idx_data].angle + deg_to_rad(lidarWindows->at(idx_sample).viewpoint.detal_yaw_deg))*((windows_col/2)+lidarWindows->at(idx_sample).viewpoint.delta_y)/m_LCDS_demi_width+windows_row+lidarWindows->at(idx_sample).viewpoint.delta_x+6.0;
+                col_lidar_data = sin(lidarWindows->at(idx_sample).observation[idx_data].angle-(deg_to_rad(lidarWindows->at(idx_sample).viewpoint.detal_yaw_deg)))*(lidarWindows->at(idx_sample).observation[idx_data].value)*(windows_row/2)/m_LCDS_demi_width+(windows_col/2)-(lidarWindows->at(idx_sample).viewpoint.delta_x/0.05);
+                row_lidar_data = cos(lidarWindows->at(idx_sample).observation[idx_data].angle-(deg_to_rad(lidarWindows->at(idx_sample).viewpoint.detal_yaw_deg)))*(lidarWindows->at(idx_sample).observation[idx_data].value)*(windows_row/2)/m_LCDS_demi_width+(windows_col/2)-(lidarWindows->at(idx_sample).viewpoint.delta_y/0.05)-6.0;
 
                 // 7. Check si la lidar data projeté est dans la LCDS windows.
                 if(col_lidar_data >= 0 && col_lidar_data < windows_col && row_lidar_data >= 0 && row_lidar_data < windows_row)
@@ -468,21 +488,79 @@ double compute_angle_btw_angle(double angle_principal, double angle_secondaire)
 
 //TODO: FUNCTION DE DEBUGAGE.
 
-void debug_data()
+void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows)
 {
     //TODO: Cette fonction va servir a voir si certaine données sont correcte.
+
+    //! SHOW LIDAR SAMPLE
+    /* std::vector<Lidar_data>* new_lidar_sample (Put an param)
+    int i = 0;
+    for(auto lidar_data : *new_lidar_sample)
+    {
+        std::cout << i << " " << lidar_data.angle << " | " << lidar_data.value << std::endl;
+        i ++;
+    }*/
+
+    //! SHOW LIDAR WINDOWS
+    /* std::vector<Lidar_sample>* lidarWindows (Put an param)
+    for(int i = 0; i < 1; i++)
+    {
+        for(int idx_sample = 0; idx_sample < lidarWindows->capacity(); idx_sample++)
+        {
+            if(i == 0)
+            {
+                // std::cout << lidarWindows->at(idx_sample).viewpoint.x << " " << lidarWindows->at(idx_sample).viewpoint.y << " " << lidarWindows->at(idx_sample).viewpoint.detal_yaw_deg << " | ";
+            }
+            if(i >= 0)
+            {
+                std::cout << lidarWindows->at(idx_sample).observation[i].angle << "|";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+    */
+
+}
+
+void debug2_data(std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b)
+{
+    //! TEST GPKP update from redis.
+    // for(auto KP_GMAP : *GPKP)
+    // {
+    //     std::cout << KP_GMAP.idx_row << "|";
+    // }
+
+    //! TEST GPKP_notYetReached_b.
+    // for(int i = 0; i < GPKP->capacity(); i++)
+    // {
+    //     if(GPKP->at(i).idx_col == -1) break;
+    //     std::cout << GPKP->at(i).idx_row << " | " << GPKP_notYetReached_b->at(i) << std::endl;
+    // }
+    // std::cout << std::endl;
+
+    //! TEST GPKP_onLCDS.
+    std::cout << "YESSHURE" << std::endl;
+    for(auto PKP : *GPKP)
+    {
+        std::cout << PKP.idx_col << " " << PKP.idx_row << std::endl;
+        if(PKP.idx_col == -1) break;
+    }
 }
 
 void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS)
 {
     //TODO: Cette fonction va permettre de visualiser si les données obtenu sont correcte.
 
+    cv::Mat LCDS_color_clone = LCDS_color->clone();
+    debug_add_robotShape(&LCDS_color_clone);
+
     // Ajouter les GPKP sur la LCDS.
     if(true)
     {
         for(auto PKP_onLCDS : *GPKP_onLCDS)
         {
-            cv::circle(*LCDS_color, cv::Point((int)(PKP_onLCDS.idx_col),(int)(PKP_onLCDS.idx_row)),0, cv::Scalar(224,0,136), cv::FILLED, 0,0);
+            cv::circle(LCDS_color_clone, cv::Point((int)(PKP_onLCDS.idx_col),(int)(PKP_onLCDS.idx_row)),0, cv::Scalar(224,0,136), cv::FILLED, 0,0);
         }
     }
 
@@ -491,7 +569,7 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
     {
         for(auto P_lidar_data : *LW_onLCDS)
         {
-            cv::circle(*LCDS_color, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),0, cv::Scalar(0,0,0), cv::FILLED, 0,0);
+            cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),0, cv::Scalar(60,80,100), cv::FILLED, 0,0);
         }
     }
 
@@ -499,8 +577,8 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
     if(true)
     {
         cv::namedWindow("Debug_LCDS",cv::WINDOW_AUTOSIZE);
-        cv::resize(*LCDS_color, *LCDS_color, cv::Size(0,0),9.0,9.0,6);
-        cv::imshow("Debug_LCDS", *LCDS_color);
+        cv::resize(LCDS_color_clone, LCDS_color_clone, cv::Size(0,0),5.0,5.0,6);
+        cv::imshow("Debug_LCDS", LCDS_color_clone);
         char d=(char)cv::waitKey(25);
     }
 }

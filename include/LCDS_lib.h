@@ -127,6 +127,7 @@ struct Param_nav
 };
 
 void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample);
+void setup_new_GPKP_notYetReached_b(std::vector<bool>* GPKP_notYetReached_b);
 void get_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample, std::string raw_lidar_sample);
 void setup_new_GPKP(std::vector<Pixel_position>* GPKP);
 void get_new_GPKP(std::vector<Pixel_position>* GPKP, std::string redis_input_str);
@@ -145,6 +146,7 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
 double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
 
 //TODO: DEBUG FONCTION.
-void debug_data();
+void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows);
+void debug2_data(std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b);
 void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS);
 void debug_add_robotShape(cv::Mat* LCDS_color);
