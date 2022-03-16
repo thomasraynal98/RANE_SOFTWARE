@@ -21,10 +21,10 @@ using namespace sw::redis;
 
 //! VARIABLE PARAM.
 double max_m_dist = 200;
-int lidarWindows_size = 5;
+int lidarWindows_size = 50;
 double LCDS_resolution = 0.05;
 double m_LCDS_width    = 8.0;
-double m_LCDS_height   = 4.0;
+double m_LCDS_height   = 3.0;
 int p_LCDS_width       = (int)(m_LCDS_width/LCDS_resolution);
 int p_LCDS_height      = (int)(m_LCDS_height/LCDS_resolution)*2;
 
@@ -124,8 +124,8 @@ void function_thread_LCDS()
             project_GPKP_onLCDS(&LCDS_color, &GPKP, &GPKP_notYetReached_b, &GPKP_onLCDS, &position_robot);
 
             // Project LidarWindows on LCDS.
-            project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_color);
-            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS);
+            project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_color, lidar_count);
+            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot);
 
 
             //! check if we reach the target.

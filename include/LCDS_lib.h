@@ -140,13 +140,14 @@ double distance_btw_pixel(Pixel_position p1, Pixel_position p2, double resolutio
 void project_GPKP_onLCDS(cv::Mat* LCDS_color, std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b, std::vector<Pixel_position>* GPKP_onLCDS, Robot_complete_position* position_robot);
 double compute_distance_RKP(Robot_complete_position* position_robot, Pixel_position* KP);
 double compute_angle_RKP_onLCDS(Robot_complete_position* position_robot, Pixel_position* KP);
+double compute_angle_btw_Robot_and_observation_pts(double pt_x, double pt_y, Robot_complete_position* position_robot);
 double deg_to_rad(double deg);
 double rad_to_deg(double rad);
-void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lidar_sample>* lidarWindows, std::vector<Pixel_position>* LW_onLCDS, cv::Mat* LCDS_color);
+void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lidar_sample>* lidarWindows, std::vector<Pixel_position>* LW_onLCDS, cv::Mat* LCDS_color, int lidar_count);
 double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
 
 //TODO: DEBUG FONCTION.
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows);
 void debug2_data(std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b);
-void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS);
+void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS, std::vector<Lidar_sample>* lidarWindows, Robot_complete_position* position_robot);
 void debug_add_robotShape(cv::Mat* LCDS_color);
