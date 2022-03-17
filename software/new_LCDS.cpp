@@ -21,7 +21,7 @@ using namespace sw::redis;
 
 //! VARIABLE PARAM.
 double max_m_dist = 200;
-int lidarWindows_size = 50;
+int lidarWindows_size = 20;
 double LCDS_resolution = 0.05;
 double m_LCDS_width    = 8.0;
 double m_LCDS_height   = 3.0;
@@ -73,8 +73,20 @@ void function_thread_redisData()
     //TODO: 1. Global Path Keypoint Point (GPKP)
     //TODO: 2. The navigation parameters.
 
+    //!T
+    int frequency = 100;
+    double time_of_loop = 1000/frequency;    
+    auto next = std::chrono::high_resolution_clock::now();
+    //!T
+
     while(true)
     {
+        //!T
+        next += std::chrono::milliseconds((int)time_of_loop);
+        std::this_thread::sleep_until(next);
+        next = std::chrono::high_resolution_clock::now();
+        //!T
+
         // If the new GPKP is different than the current one, get it.
         redis_input_str = *(redis.get("State_global_path"));
         if(redis_input_str.compare(GPKP_string) != 0 && \
@@ -87,6 +99,13 @@ void function_thread_redisData()
 
         // Get the navigation parameters.
         get_navigation_param(&redis, &navigation_param);
+
+        // Detect if we have a loop closure.
+        if(new_relocalisation(&redis))
+        {
+            reset_lidarWindows(&lidarWindows);
+            lidar_count = 0;
+        }
     }
 }
 

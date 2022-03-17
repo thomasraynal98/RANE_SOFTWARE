@@ -126,6 +126,8 @@ int main()
         }
 
         // MAIN THREAD PART.
+        double hide_angle = 10*M_PI/180;
+        double LCDS_angle = -1;
         while (soyBoy.ret && ydlidar::os_isOk()) 
         {
             LaserScan scan;
@@ -135,21 +137,20 @@ int main()
                 soyBoy.sample.clear();
 
                 /* Run all sample. */
+                int i = 0;
                 for(auto point : scan.points)
                 {
-                    /* Only take the no obstruted data. */
-                    if(abs(point.angle)>M_PI_2+(10*M_PI/180)) //! we added 10° because robot body blocked lidar FOV.
+                    if(abs(point.angle) > M_PI_2 + hide_angle && \
+                    point.range > 0.05 && point.range < 10) 
                     {
-                        /* Init observation variable. */
-                        Lidar_data observation;
-                        observation.angle = -point.angle; // rad [0,2PI]
-                        observation.value = point.range;  // meter 
+                        // Convert lidar ref to LCDS ref.
+                        if(point.angle < 0)  LCDS_angle = point.angle + M_PI;
+                        if(point.angle >= 0) LCDS_angle = point.angle - M_PI;
 
-                        /* push the sample if they are in good. */
-                        if(observation.value > 0.05 && observation.value < 10)
-                        {
-                            soyBoy.sample.push_back(observation);
-                        }
+                        Lidar_data observation;
+                        observation.angle = point.angle;
+                        observation.value = point.range;
+                        soyBoy.sample.push_back(observation);
                     }
                 }
                 publish_lidar_sample(&redis, &soyBoy);

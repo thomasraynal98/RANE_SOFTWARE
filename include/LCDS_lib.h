@@ -145,6 +145,8 @@ double deg_to_rad(double deg);
 double rad_to_deg(double rad);
 void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lidar_sample>* lidarWindows, std::vector<Pixel_position>* LW_onLCDS, cv::Mat* LCDS_color, int lidar_count);
 double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
+bool new_relocalisation(sw::redis::Redis* redis);
+void reset_lidarWindows(std::vector<Lidar_sample>* lidarWindows);
 
 //TODO: DEBUG FONCTION.
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows);

@@ -60,7 +60,16 @@ void send_pose_information(sw::redis::Redis* redis, const slamcore::Map2DInterfa
     yaw = std::atan2(siny_cosp, cosy_cosp);
 
     // TODO : please god don't judge me.
-    pixel_yaw = 360 - modulo((int)(yaw*(180/M_PI))+90,360);
+    // double tempo = yaw * (180/ M_PI) + 90.0;
+    pixel_yaw = 360.0 - (yaw * 180 / M_PI + 180);
+    if(pixel_yaw < 0) pixel_yaw += 360;
+    // std::cout << "PIXEL = " << pixel_yaw << std::endl;
+
+    // TODO : please god don't judge me. 2222
+    double wait = yaw*(180/M_PI)+90;
+    if(wait < 0) wait += 360;
+    
+    pixel_yaw = 360 - wait;
 
     message_position += std::to_string(x) + "/" + std::to_string(y) + "/" + std::to_string(z) + "/" + std::to_string(r) + "/" + std::to_string(p) + "/" + std::to_string(yaw) + "/";
     redis->set("State_robot_position", message_position);
@@ -98,7 +107,14 @@ bool check_map_data(sw::redis::Redis* redis)
     return false;
 }
 
-int modulo(int a, int b) { return a < 0 ? b - (-a % b): a % b; }
+// int modulo(int a, int b) { return a < 0 ? b - (-a % b): a % b; }
+
+double modulo(double a, double b) {
+    double n = std::ceil(a / b);
+    double r = a - b * n;
+    if (a < 0) return b - r;
+    return r;
+}
 
 void feed_encoder_data(std::string msg, std::shared_ptr<slamcore::MobileRobotSubsystemInterface> robot_feed, slamcore::IDT* sample_counter)
 {
