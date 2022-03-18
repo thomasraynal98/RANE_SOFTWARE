@@ -174,7 +174,9 @@ TARGET_LINK_LIBRARIES(prog_com_led
 ADD_EXECUTABLE(LocalCDS
 software/new_LCDS.cpp
 src/LCDS_lib.cpp 
-software/new_LCDS.cpp)
+include/LCDS_lib.h
+src/global_path_lib.cpp 
+include/global_path_lib.h)
 
 TARGET_LINK_LIBRARIES(LocalCDS
     redis++

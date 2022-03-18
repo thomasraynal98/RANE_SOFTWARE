@@ -1,3 +1,6 @@
+#ifndef LCDS_LIB_H
+#define LCDS_LIB_H
+
 #include <string.h>
 #include <iostream>
 #include <vector>
@@ -7,6 +10,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+
+#include "global_path_lib.h"
 
 struct Lidar_data
 {
@@ -126,6 +131,29 @@ struct Param_nav
         {}
 };
 
+struct Intermediate_LCDS_KP
+{
+    double angle, distance;
+    //! This variable is usable just for one points of view.
+    Pixel_position px_onLCDS;
+    Robot_position_transformation viewpoint;
+
+    // Constructor
+    Intermediate_LCDS_KP(double a, double b)
+        : angle(a)
+        , distance(b)
+        , px_onLCDS(-1,-1)
+        {}
+
+    void operator=(Intermediate_LCDS_KP& KP)
+    {
+        angle = KP.angle;
+        distance = KP.distance;
+        px_onLCDS = KP.px_onLCDS;
+    }
+};
+
+//TODO: PART A function.
 void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample);
 void setup_new_GPKP_notYetReached_b(std::vector<bool>* GPKP_notYetReached_b);
 void get_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample, std::string raw_lidar_sample);
@@ -137,6 +165,7 @@ void add_lidar_sample_to_lidarWindows(int lidar_count, std::vector<Lidar_sample>
 bool is_new_position_detected(Robot_complete_position* position_robot, sw::redis::Redis* redis);
 void filter_GPKP(Robot_complete_position* position_robot, std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b);
 double distance_btw_pixel(Pixel_position p1, Pixel_position p2, double resolution);
+double distance_btw_pts(double pts_A_x, double pt_A_y, double pt_B_x, double pt_B_y);
 void project_GPKP_onLCDS(cv::Mat* LCDS_color, std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b, std::vector<Pixel_position>* GPKP_onLCDS, Robot_complete_position* position_robot);
 double compute_distance_RKP(Robot_complete_position* position_robot, Pixel_position* KP);
 double compute_angle_RKP_onLCDS(Robot_complete_position* position_robot, Pixel_position* KP);
@@ -148,8 +177,23 @@ double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
 bool new_relocalisation(sw::redis::Redis* redis);
 void reset_lidarWindows(std::vector<Lidar_sample>* lidarWindows);
 
+//TODO: PART B function.
+void project_ILKP_onLCDS(cv::Mat* LCDS_color, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP);
+void select_local_destination(Pixel_position* Local_destination, Intermediate_LCDS_KP* ILKP, Robot_complete_position* position_robot, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP);
+bool ILKP_is_onLCDS(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP);
+void ILKP_reset(Intermediate_LCDS_KP* ILKP);
+bool ILKP_is_reach(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP, double m_validation_distance);
+bool ILKP_is_available(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP);
+bool PKP_is_available(cv::Mat* LCDS_compute, Pixel_position* px);
+void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* Local_trajectory, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP);
+void reset_Pixel_position_vector(std::vector<Pixel_position>* Local_trajectory);
+Pixel_position select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option);
+bool is_the_same(Pixel_position* px_A, Pixel_position* px_B);
+
 //TODO: DEBUG FONCTION.
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows);
 void debug2_data(std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notYetReached_b);
-void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS, std::vector<Lidar_sample>* lidarWindows, Robot_complete_position* position_robot);
+void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS, std::vector<Lidar_sample>* lidarWindows, Robot_complete_position* position_robot, Pixel_position* Local_destination, std::vector<Pixel_position>* Local_trajectory, Intermediate_LCDS_KP* ILKP);
 void debug_add_robotShape(cv::Mat* LCDS_color);
+
+#endif

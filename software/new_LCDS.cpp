@@ -30,6 +30,7 @@ int p_LCDS_height      = (int)(m_LCDS_height/LCDS_resolution)*2;
 
 //! VARIABLE OPENCV.
 cv::Mat LCDS_color(p_LCDS_height, p_LCDS_width, CV_8UC3, cv::Scalar(255, 255, 255));
+cv::Mat LCDS_compute(p_LCDS_height, p_LCDS_width, CV_8UC1, cv::Scalar(255));
 
 //! VARIABLE.
 auto redis = Redis("tcp://127.0.0.1:6379");
@@ -39,8 +40,8 @@ std::string redis_input_str;
 std::string GPKP_string = "";
 std::vector<Pixel_position> GPKP;
 Param_nav navigation_param;
-std::vector<Lidar_sample> lidarWindows;
 Robot_complete_position position_robot;
+std::vector<Lidar_sample> lidarWindows;
 
 //! VARIABLE SECONDAIRE.
 int lidar_count = 0;
@@ -116,6 +117,9 @@ void function_thread_LCDS()
     //TODO: 2. An LCDS process is run when we are in Autonomous mode, and the GPKP is processed.
     //TODO: 3. AN LCDS process is run if we are not reach the destination yet.
 
+    Intermediate_LCDS_KP ILKP(-1,-1);
+    Pixel_position Local_destination(-1,-1);
+
     std::vector<bool> GPKP_notYetReached_b;
     GPKP_notYetReached_b.reserve(GPKP.capacity());
     setup_new_GPKP_notYetReached_b(&GPKP_notYetReached_b);
@@ -127,6 +131,10 @@ void function_thread_LCDS()
     std::vector<Pixel_position> LW_onLCDS;
     LW_onLCDS.reserve(360*lidarWindows_size);
     setup_new_GPKP(&LW_onLCDS); //! name of this function is not pertinant but function is.
+
+    std::vector<Pixel_position> Local_trajectory;
+    Local_trajectory.reserve((int)(p_LCDS_width*1.5));
+    setup_new_GPKP(&Local_trajectory); //! name of this function is not pertinant but function is.
 
     while(true)
     {
@@ -143,9 +151,16 @@ void function_thread_LCDS()
             project_GPKP_onLCDS(&LCDS_color, &GPKP, &GPKP_notYetReached_b, &GPKP_onLCDS, &position_robot);
 
             // Project LidarWindows on LCDS.
-            project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_color, lidar_count);
-            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot);
+            cv::Mat LCDS_compute_clone = LCDS_compute.clone();
+            project_LW_onLCDS(&position_robot, &lidarWindows, &LW_onLCDS, &LCDS_compute_clone, lidar_count);
 
+            // Select Destination.
+            select_local_destination(&Local_destination, &ILKP, &position_robot, &LCDS_compute_clone, &GPKP_onLCDS);
+
+            // Create trajectory.
+            create_trajectory(&redis, &Local_destination, &LCDS_compute_clone, &Local_trajectory, &position_robot, &ILKP);
+
+            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP);
 
             //! check if we reach the target.
         }
