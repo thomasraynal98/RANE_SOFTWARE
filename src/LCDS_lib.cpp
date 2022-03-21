@@ -1,5 +1,6 @@
 #include <LCDS_lib.h>
 #include <global_path_lib.h>
+#include <bits/stdc++.h> 
 
 void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample)
 {
@@ -113,22 +114,22 @@ void setup_lidarWindows(std::vector<Lidar_sample>* lidarWindows)
     }
 }
 
-void reset_lidarWindows(std::vector<Lidar_sample>* lidarWindows)
+void reset_lidarWindows(std::vector<Lidar_sample>& lidarWindows)
 {
     //TODO: reset value.
     Lidar_data reset_model(-1,-1);
     Robot_position_transformation reset_model_view;
-    for(int idx_sample; idx_sample < lidarWindows->capacity(); idx_sample++)
+    for(int idx_sample; idx_sample < lidarWindows.capacity(); idx_sample++)
     {
-        if(lidarWindows->at(idx_sample).observation[0].value != -1)
+        if(lidarWindows[idx_sample].observation[0].value != -1)
         {
-            for(auto lidar_data: lidarWindows->at(idx_sample).observation)
+            for(auto &lidar_data: lidarWindows[idx_sample].observation)
             {
-                if(lidarWindows->at(idx_sample).observation[0].value == -1) break;
+                if(lidarWindows[idx_sample].observation[0].value == -1) break;
                 lidar_data = reset_model;
             }
 
-            lidarWindows->at(idx_sample).viewpoint = reset_model_view;
+            lidarWindows[idx_sample].viewpoint = reset_model_view;
         }
     }
 }
@@ -527,15 +528,16 @@ double compute_angle_btw_Robot_and_observation_pts(double pt_x, double pt_y, Rob
 
 double compute_angle_btw_px(Pixel_position* p1, Pixel_position* p2)
 {
-    double x_sum = p1->idx_col - p2->idx_col;
-    double y_sum = p1->idx_row - p2->idx_row;
+    //TODO: Cette fonction va compute un angle entre le pixel d'origine et le pixel
+    double y_sum = p1->idx_col - p2->idx_col;
+    double x_sum = p1->idx_row - p2->idx_row;
     double angle_rad = acos((x_sum)/(sqrt(pow(x_sum, 2.0) + pow(y_sum, 2.0))));
     
-    angle_rad += M_PI_2;
-    if(angle_rad > M_PI) angle_rad -= 2*M_PI;
+    if(y_sum > 0) angle_rad *= -1;
 
     //! angle_rad est dans le referenciel de opencv image.
-    //! mettre directement dans le ref lidar.
+    //! mettre directement dans le ref lidar. [-pi,0,0,pi]
+
     return angle_rad;
 }
 
@@ -633,8 +635,11 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
     // 7. Draw data on LCDS_compute.
     for(auto lidar_data : *LW_onLCDS)
     {
-        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)),10, cv::Scalar(200), cv::FILLED, 0,0);
-        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)),6, cv::Scalar(0),   cv::FILLED, 0,0);
+        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)),18, cv::Scalar(200), cv::FILLED, 0,0);
+    }
+    for(auto lidar_data : *LW_onLCDS)
+    {
+        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)), 6,   cv::Scalar(0), cv::FILLED, 0,0);
     }
 }
 
@@ -707,14 +712,15 @@ void project_ILKP_onLCDS(cv::Mat* LCDS_color, Robot_complete_position* position_
 
     // 2. Project ILKP on LCDS.
     angle_btw_obs = compute_angle_btw_angle(position_robot->yaw_deg_cam, ILKP->viewpoint.yaw_deg);
-    ILKP->px_onLCDS.idx_col = cos(ILKP->angle+deg_to_rad(angle_btw_obs)+M_PI_2)*ILKP->distance/0.05+idx_col_origine;
-    ILKP->px_onLCDS.idx_row = sin(ILKP->angle+deg_to_rad(angle_btw_obs)+M_PI_2)*ILKP->distance/0.05+idx_row_origine;
+
+    ILKP->px_onLCDS.idx_col = cos(ILKP->angle+deg_to_rad(angle_btw_obs) - M_PI_2)*ILKP->distance/0.05+idx_col_origine;
+    ILKP->px_onLCDS.idx_row = sin(ILKP->angle+deg_to_rad(angle_btw_obs) - M_PI_2)*ILKP->distance/0.05+idx_row_origine;
 }
 
 void select_local_destination(Pixel_position* Local_destination, Intermediate_LCDS_KP* ILKP, Robot_complete_position* position_robot, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS)
 {
     //TODO: Cette function va selectionner la local destination de cette époque du LCDS.
-
+    
     // 1. Check if they are a ILKP init.
     if(ILKP->distance != -1)
     {
@@ -786,14 +792,14 @@ bool ILKP_is_reach(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP, double m_v
 
 bool ILKP_is_available(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP)
 {
-    if((int)LCDS_compute->at<uchar>((int)(ILKP->px_onLCDS.idx_col), (int)(ILKP->px_onLCDS.idx_row)) == 0)
+    if((int)LCDS_compute->at<uchar>((int)(ILKP->px_onLCDS.idx_row), (int)(ILKP->px_onLCDS.idx_col)) == 0)
     {
         return false;
     }
     return true;
 }
 
-Pixel_position select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option)
+void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option)
 {
     //TODO: Cette fonction va retourner le Farest Projected Key Point "available" on LCDS.
     //! unknow option va colorer la partie inconnu et chercher des points horizontal libre.
@@ -808,31 +814,42 @@ Pixel_position select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_comp
     //! distance_up   : represente la distance max du FPKP.
     //! distance_down : represente la distance min du FPKP en dessous duquel pas de destination est detecter.
     double distance_up    = 20.0;
-    double distance_down  = 2.0;
-
+    double distance_down  = 1.5;
+    
     if(unknow_option == 0)
     {
         double distance_max = -1;
-        while(FPKP.idx_col == -1 && distance_max == -1)
+
+        int i = 0; //TODO: change this
+        while(i < 30)
         {
             // found new PKP.
             distance_max = -1;
+            double m_distance_btw;
             for(auto PKP : *GPKP_onLCDS)
             {
-                double m_distance_btw = distance_btw_pixel(origine_robot_centre, PKP, 0.05);
-                if(m_distance_btw > distance_max && m_distance_btw < distance_up && m_distance_btw > distance_down) 
+                if(PKP.idx_col != -1 && PKP.idx_row != -1)
                 {
-                    FPKP = PKP;
-                    distance_max = m_distance_btw;
+                    m_distance_btw = distance_btw_pixel(origine_robot_centre, PKP, 0.05);
+                    if(m_distance_btw > distance_max && m_distance_btw < distance_up && m_distance_btw > distance_down) 
+                    {
+                        FPKP = PKP;
+                        distance_max = m_distance_btw;
+                    }
                 }
             }
-
             if(distance_max != -1) distance_up = distance_max;
 
             // check if it's available.
             if(!PKP_is_available(LCDS_compute, &FPKP))
             {
                 FPKP = reset_model;
+                i++;
+            }
+            else
+            {
+                *Local_destination = FPKP;
+                return;
             }
         }
     }
@@ -842,17 +859,18 @@ Pixel_position select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_comp
 
 bool PKP_is_available(cv::Mat* LCDS_compute, Pixel_position* px)
 {
-    if((int)LCDS_compute->at<uchar>((int)(px->idx_col), (int)(px->idx_row)) == 0)
+    if((int)LCDS_compute->at<uchar>(cv::Point((int)(px->idx_col), (int)(px->idx_row))) == 0)
     {
         return false;
     }
     return true;
 }
 
-void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* Local_trajectory, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP)
+void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>& Local_trajectory, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP)
 {
     //! EXCEPTION : clear Local_trajectory.
     reset_Pixel_position_vector(Local_trajectory);
+
     if(Local_destination->idx_col == -1 && Local_destination->idx_row == -1) 
     {
         return;
@@ -861,12 +879,18 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
     Pixel_position origine_robot_centre((int)LCDS_compute->cols/2, (int)LCDS_compute->rows/2);
     
     //! Convert new format to old one.
-    Pair current_position = {origine_robot_centre.idx_col, origine_robot_centre.idx_row};
-    Pair destination      = {  Local_destination->idx_col,   Local_destination->idx_row};
+    Pair current_position = {(int)origine_robot_centre.idx_col, (int)origine_robot_centre.idx_row};
+    Pair destination      = {(int)Local_destination->idx_col,   (int)Local_destination->idx_row};
 
     //! Old format use Pair for A*.
     std::vector<Pair> local_trajectory_pair_format;
-    bool trajectory_found = aStarSearch(*LCDS_compute, current_position, destination, redis, 1, &local_trajectory_pair_format);
+
+    //! To avoid back A* path.
+    cv::Mat copie_cut;
+    cv::Rect crop_region(0, 0, (int)(LCDS_compute->cols), (int)(LCDS_compute->rows/2)+1);
+    copie_cut = (*LCDS_compute)(crop_region); // Slicing to crop the image
+
+    bool trajectory_found = aStarSearch(copie_cut, current_position, destination, redis, 1, &local_trajectory_pair_format);
 
     if(trajectory_found)
     {   
@@ -874,8 +898,8 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
         int counter = 0;
         for(auto path_px : local_trajectory_pair_format)
         {
-            Local_trajectory->at(counter).idx_col = path_px.first;
-            Local_trajectory->at(counter).idx_row = path_px.second;
+            Local_trajectory[counter].idx_col = path_px.first;
+            Local_trajectory[counter].idx_row = path_px.second;
             counter++;
         }
 
@@ -887,20 +911,27 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
             Pixel_position LCDS_robot_origine((int)(LCDS_compute->cols/2), (int)(LCDS_compute->rows/2));
 
             //! size max est égale à 70% d'une demi diagonal.
-            int size_trajectory_max = (int)(distance_btw_pixel(LCDS_opencv_origine, LCDS_robot_origine,1) * 0.7);
+            int size_trajectory_max = (int)(distance_btw_pixel(LCDS_opencv_origine, LCDS_robot_origine,1) * 0.1);
 
             if(size_trajectory >= size_trajectory_max)
             {
                 //! We select the 80% index of this path.
-                int index_selection_ILKP = (int)(size_trajectory*0.8);
+                int index_selection_ILKP = (int)(size_trajectory*0.5);
                 
                 // setup new ILKP.
                 Pixel_position reset_model(-1,-1);
 
                 //! We don't use ILKP for this epoque, so we don't need to save this pixel coordinate.
                 ILKP->px_onLCDS = reset_model;
-                ILKP->distance  = distance_btw_pixel(origine_robot_centre, Local_trajectory->at(index_selection_ILKP),0.05);
-                ILKP->angle     = compute_angle_btw_px(&origine_robot_centre, &Local_trajectory->at(index_selection_ILKP));
+                ILKP->distance  = distance_btw_pixel(origine_robot_centre, Local_trajectory[index_selection_ILKP],0.05);
+                ILKP->angle     = compute_angle_btw_px(&origine_robot_centre, &Local_trajectory[index_selection_ILKP]);
+                ILKP->viewpoint.x       = position_robot->x_center;
+                ILKP->viewpoint.y       = position_robot->y_center;
+                ILKP->viewpoint.yaw_deg = position_robot->yaw_deg_center;
+            }
+            else
+            {
+                ILKP_reset(ILKP);
             }
         }
     }
@@ -916,10 +947,10 @@ bool is_the_same(Pixel_position* px_A, Pixel_position* px_B)
     return false;
 }
 
-void reset_Pixel_position_vector(std::vector<Pixel_position>* Local_trajectory)
+void reset_Pixel_position_vector(std::vector<Pixel_position>& Local_trajectory)
 {
     Pixel_position reset_model(-1,-1);
-    for(auto px : *Local_trajectory)
+    for(auto &px : Local_trajectory)
     {
         px = reset_model;
     }
@@ -1012,7 +1043,24 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
     {
         for(auto P_lidar_data : *LW_onLCDS)
         {
-            cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),0, cv::Scalar(60,80,100), cv::FILLED, 0,0);
+            //! MODE PRECIS
+            if(false)
+            {
+                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),0, cv::Scalar(60,80,100), cv::FILLED, 0,0);
+            }
+            //! MODE COMPUTE.
+            if(true)
+            {
+                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),18, cv::Scalar(60,80,100), cv::FILLED, 0,0);
+            }
+        }
+        //! MODE COMPUTE.
+        for(auto P_lidar_data : *LW_onLCDS)
+        {
+            if(true)
+            {
+                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),6, cv::Scalar(60/2,80/2,100/2), cv::FILLED, 0,0);
+            }
         }
     }
 
@@ -1030,7 +1078,7 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
             //! On rajoute - 90 pour passer dans le ref de OpenCV.
             col = cos(debug_angle_rad - M_PI_2)*distance_Frame_to_LidarObservationRef/0.05+(windows_col/2);
             row = sin(debug_angle_rad - M_PI_2)*distance_Frame_to_LidarObservationRef/0.05+(windows_row/2)-6.0;
-
+            
             cv::circle(LCDS_color_clone, cv::Point((int)(col),(int)(row)),0, cv::Scalar(0,150,250), cv::FILLED, 0,0);
         }
     }
@@ -1039,9 +1087,9 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
     if(true)
     {
         // No destination detect.
-        if(Local_destination->idx_col == -1 && Local_destination->idx_row)
+        if(Local_destination->idx_col == -1 && Local_destination->idx_row == -1)
         {
-            cv::circle(LCDS_color_clone, cv::Point((int)(windows_col),(int)(windows_row * 0.75)), 5, cv::Scalar(0,0,255), cv::FILLED, 0,0);     
+            cv::circle(LCDS_color_clone, cv::Point((int)(windows_col/2),(int)(windows_row * 0.75)), 3, cv::Scalar(0,0,255), cv::FILLED, 0,0);     
         }
         else
         {
@@ -1050,14 +1098,17 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
             {
                 cv::circle(LCDS_color_clone, cv::Point((int)(px.idx_col),(int)(px.idx_row)), 0, cv::Scalar(0,255,115), cv::FILLED, 0,0);  
             }
-            // draw destination.
-            if(is_the_same(&ILKP->px_onLCDS, Local_destination))
+            if(true)
             {
-                cv::circle(LCDS_color_clone, cv::Point((int)(Local_destination->idx_col),(int)(Local_destination->idx_row)), 0, cv::Scalar(255,130,255), cv::FILLED, 0,0);  
-            }
-            else
-            {
-                cv::circle(LCDS_color_clone, cv::Point((int)(Local_destination->idx_col),(int)(Local_destination->idx_row)), 0, cv::Scalar(255,130,130), cv::FILLED, 0,0); 
+                // draw destination.
+                if(is_the_same(&ILKP->px_onLCDS, Local_destination))
+                {
+                    cv::circle(LCDS_color_clone, cv::Point((int)(Local_destination->idx_col),(int)(Local_destination->idx_row)), 2, cv::Scalar(255,130,255), cv::FILLED, 0,0);  
+                }
+                else
+                {
+                    cv::circle(LCDS_color_clone, cv::Point((int)(Local_destination->idx_col),(int)(Local_destination->idx_row)), 2, cv::Scalar(255,130,130), cv::FILLED, 0,0); 
+                }
             }
         }
     }

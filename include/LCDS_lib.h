@@ -10,6 +10,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <bits/stdc++.h> 
 
 #include "global_path_lib.h"
 
@@ -175,7 +176,7 @@ double rad_to_deg(double rad);
 void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lidar_sample>* lidarWindows, std::vector<Pixel_position>* LW_onLCDS, cv::Mat* LCDS_color, int lidar_count);
 double compute_angle_btw_angle(double angle_principal, double angle_secondaire);
 bool new_relocalisation(sw::redis::Redis* redis);
-void reset_lidarWindows(std::vector<Lidar_sample>* lidarWindows);
+void reset_lidarWindows(std::vector<Lidar_sample>& lidarWindows);
 
 //TODO: PART B function.
 void project_ILKP_onLCDS(cv::Mat* LCDS_color, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP);
@@ -185,9 +186,9 @@ void ILKP_reset(Intermediate_LCDS_KP* ILKP);
 bool ILKP_is_reach(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP, double m_validation_distance);
 bool ILKP_is_available(cv::Mat* LCDS_compute, Intermediate_LCDS_KP* ILKP);
 bool PKP_is_available(cv::Mat* LCDS_compute, Pixel_position* px);
-void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* Local_trajectory, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP);
-void reset_Pixel_position_vector(std::vector<Pixel_position>* Local_trajectory);
-Pixel_position select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option);
+void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>& Local_trajectory, Robot_complete_position* position_robot, Intermediate_LCDS_KP* ILKP);
+void reset_Pixel_position_vector(std::vector<Pixel_position>& Local_trajectory);
+void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option);
 bool is_the_same(Pixel_position* px_A, Pixel_position* px_B);
 
 //TODO: DEBUG FONCTION.

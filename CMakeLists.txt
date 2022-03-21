@@ -40,7 +40,8 @@ ADD_EXECUTABLE(exempleB
 TARGET_LINK_LIBRARIES(exempleB
     redis++
     pthread
-    hiredis)
+    hiredis
+    ${OpenCV_LIBS})
 
 # PROGRAMME YAML MANAGER.
 ADD_EXECUTABLE(prog_data_manager

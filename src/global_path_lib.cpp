@@ -118,10 +118,10 @@ bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, i
     // constexpr auto p = static_cast<int>(grid.cols);
     // const int pp = grid.rows;
 	// array<array<cell, COL>, ROW> cellDetails;
-    int cols = grid.rows;
-    int rows = grid.cols;
+    int cols = grid.cols;
+    int rows = grid.rows;
     
-    std::vector<std::vector<cell>> cellDetails(rows, std::vector<cell>(cols));
+    std::vector<std::vector<cell>> cellDetails(cols, std::vector<cell>(rows));
 
 	int i, j;
 	// Initialising the parameters of the starting node
@@ -193,15 +193,15 @@ bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, i
 
                         /* Process the complete path. */
                         std::stack<Pair> Path;
-                        int row = dest.first;
-                        int col = dest.second;
-                        Pair next_node = cellDetails[row][col].parent;
+                        int col = dest.first;
+                        int row = dest.second;
+                        Pair next_node = cellDetails[col][row].parent;
                         do {
                             Path.push(next_node);
-                            next_node = cellDetails[row][col].parent;
-                            row = next_node.first;
-                            col = next_node.second;
-                        } while (cellDetails[row][col].parent != next_node);
+                            next_node = cellDetails[col][row].parent;
+                            col = next_node.first;
+                            row = next_node.second;
+                        } while (cellDetails[col][row].parent != next_node);
                         
                         /* Transform the brut path to keypoint path. */
                         if(local_option == 1) 
@@ -221,19 +221,19 @@ bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, i
 
                         /* Add weight to gNew if path is in proximity area. */
 
-                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 255)
+                        if((int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) == 255)
 						    {fNew = cellDetails[i][j].f + 1.0;}
 
                         //! NEW ONE (for dirty pixel)
-                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) != 0 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 50 && \
-                        (int)grid.at<uchar>(neighbour.second, neighbour.first) != 120 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 200 && \
-                        (int)grid.at<uchar>(neighbour.second, neighbour.first) != 255 && (int)grid.at<uchar>(neighbour.second, neighbour.first) != 75)
+                        if((int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 0 && (int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 50 && \
+                        (int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 120 && (int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 200 && \
+                        (int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 255 && (int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) != 75)
 						    {fNew = cellDetails[i][j].f + 1.0;}
-                        //! NEW ONE (highway)
-                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 75)
+                        //! NEW ONE (highway)s
+                        if((int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) == 75)
 						    {fNew = cellDetails[i][j].f + 0.2;}
 
-                        if((int)grid.at<uchar>(neighbour.second, neighbour.first) == 200)
+                        if((int)grid.at<uchar>(cv::Point(neighbour.first, neighbour.second)) == 200)
 						    {fNew = cellDetails[i][j].f + 6.0;} // IMPORTANT VALUE.
 
                         if(add_y != 0 && add_x !=0){fNew += 0.01;}
@@ -288,7 +288,10 @@ bool aStarSearch(cv::Mat grid, Pair& src, Pair& dest, sw::redis::Redis* redis, i
 bool isValid(cv::Mat grid, const Pair& point)
 { 
     // Returns true if row number and column number is in range.
-    return (point.first >= 0) && (point.first < grid.size[1]) && (point.second >= 0) && (point.second < grid.size[0]);
+    // return (point.first >= 0) && (point.first < grid.size[1]) && (point.second >= 0) && (point.second < grid.size[0]);
+    //! point.first = cols
+    //! point.second = rows
+    return point.first >= 0 && point.first < grid.cols && point.second >= 0 && point.second < grid.rows;
 }
 
 double calculateHValue(const Pair src, const Pair dest)
@@ -313,7 +316,7 @@ bool isUnBlocked(cv::Mat grid, const Pair& point)
 	// return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) == 255) || (grid.at<uchar>(point.second,point.first) == 200));
 
     //! NEW ONE
-    return isValid(grid, point) && ((grid.at<uchar>(point.second, point.first) != 0) && (grid.at<uchar>(point.second,point.first) != 50) && (grid.at<uchar>(point.second,point.first) != 120));
+    return isValid(grid, point) && ((grid.at<uchar>(cv::Point(point.first, point.second)) != 0) && (grid.at<uchar>(cv::Point(point.first, point.second)) != 50) && (grid.at<uchar>(cv::Point(point.first, point.second)) != 120));
 }
 
 bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src)
@@ -384,6 +387,7 @@ void from_global_path_to_keypoints_path(std::stack<Pair> Path, sw::redis::Redis*
         the_distance_from_destination += calculateHValue(previous_p, p)* 0.05;
 
         vector_distances_from_destination.push_back(the_distance_from_destination); 
+
         vector_global_path.push_back(p);
         
         previous_p = p;

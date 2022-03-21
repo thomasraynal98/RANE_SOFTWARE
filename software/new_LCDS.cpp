@@ -7,6 +7,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/utility.hpp>
+#include <bits/stdc++.h> 
 
 #include <LCDS_lib.h>
 
@@ -42,6 +44,7 @@ std::vector<Pixel_position> GPKP;
 Param_nav navigation_param;
 Robot_complete_position position_robot;
 std::vector<Lidar_sample> lidarWindows;
+Intermediate_LCDS_KP ILKP(-1,-1);
 
 //! VARIABLE SECONDAIRE.
 int lidar_count = 0;
@@ -94,6 +97,7 @@ void function_thread_redisData()
            redis_input_str.length() > 2 && \
            redis_input_str.compare("no_path") != 0)
         {
+            ILKP_reset(&ILKP);
             get_new_GPKP(&GPKP, redis_input_str);
             GPKP_string = redis_input_str;
         }
@@ -104,7 +108,7 @@ void function_thread_redisData()
         // Detect if we have a loop closure.
         if(new_relocalisation(&redis))
         {
-            reset_lidarWindows(&lidarWindows);
+            reset_lidarWindows(lidarWindows);
             lidar_count = 0;
         }
     }
@@ -117,7 +121,6 @@ void function_thread_LCDS()
     //TODO: 2. An LCDS process is run when we are in Autonomous mode, and the GPKP is processed.
     //TODO: 3. AN LCDS process is run if we are not reach the destination yet.
 
-    Intermediate_LCDS_KP ILKP(-1,-1);
     Pixel_position Local_destination(-1,-1);
 
     std::vector<bool> GPKP_notYetReached_b;
@@ -136,6 +139,8 @@ void function_thread_LCDS()
     Local_trajectory.reserve((int)(p_LCDS_width*1.5));
     setup_new_GPKP(&Local_trajectory); //! name of this function is not pertinant but function is.
 
+    int64 t0 = cv::getTickCount();
+    int64 t1 = cv::getTickCount();
     while(true)
     {
         if(is_new_position_detected(&position_robot, &redis) && \
@@ -144,6 +149,12 @@ void function_thread_LCDS()
         (*(redis.get("State_is_autonomous"))).compare("true") == 0 && \
         (*(redis.get("State_slamcore"))).compare("OK") == 0)
         {   
+            
+            t0 = cv::getTickCount();
+            double secs = (t0-t1)/cv::getTickFrequency();
+            std::cout << "time for loops : " << secs << " Hz: " << 1/secs << std::endl;
+            t1 = cv::getTickCount();
+
             // Filter the GPKP and show only unreach KP.
             filter_GPKP(&position_robot, &GPKP, &GPKP_notYetReached_b);
 
@@ -156,11 +167,13 @@ void function_thread_LCDS()
 
             // Select Destination.
             select_local_destination(&Local_destination, &ILKP, &position_robot, &LCDS_compute_clone, &GPKP_onLCDS);
-
+            
             // Create trajectory.
-            create_trajectory(&redis, &Local_destination, &LCDS_compute_clone, &Local_trajectory, &position_robot, &ILKP);
+            create_trajectory(&redis, &Local_destination, &LCDS_compute_clone, Local_trajectory, &position_robot, &ILKP);
 
             debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP);
+
+            // Compute motor commande.
 
             //! check if we reach the target.
         }
