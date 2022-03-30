@@ -47,5 +47,6 @@ Pair get_destination_position(sw::redis::Redis* redis);
 Pair get_current_position(sw::redis::Redis* redis);
 void send_keypoint_global_path(sw::redis::Redis* redis, std::vector<Pair>* keypoint_global_path);
 bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src);
+void nicolas_test_function(sw::redis::Redis* redis, double back_value, double front_value, double angle);
 
 #endif

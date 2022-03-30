@@ -13,12 +13,116 @@ using namespace sw::redis;
 auto redis = Redis("tcp://127.0.0.1:6379");
 sio::socket::ptr current_socket;
 std::thread thread_A, thread_B, thread_C;
+sio::client h;
+bool stream_video = false;
+
+void bind_events(sio::socket::ptr current_socket)
+{
+    /*
+        DESCRIPTION: this function store all kind of message that we can receive 
+            from the main API.
+    */
+
+    /* If our current map is the good one. */
+    current_socket->on("good", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        redis.set("State_map_validate", "true");
+    }));
+
+    /* If our current map is not the good one, we need to get a new one. */
+    current_socket->on("download", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        redis.set("Param_localisation", std::to_string(data->get_map()["id"]->get_int()));
+        redis.set("Param_id_current_map", data->get_map()["localisation"]->get_string());
+        redis.set("Param_link_current_map_session", data->get_map()["link_session"]->get_string());
+        redis.set("Param_link_current_map_png", data->get_map()["link_png"]->get_string());
+        redis.set("State_map_available", "false");
+        redis.set("State_map_validate", "true");
+    }));
+
+    /* In manual mode we need that robot do a precise command. */
+    current_socket->on("command_to_do", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        redis.set("State_is_autonomous", "false");
+        redis.publish("command_micro", data->get_string());
+    }));
+
+    /* In autonav mode we need that robot reach a new point. */
+    current_socket->on("position_to_reach", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        std::string msg_destination = std::to_string(data->get_map()["i"]->get_int()) + "/" + std::to_string(data->get_map()["j"]->get_int()) + "/";
+        redis.set("State_position_to_reach", msg_destination);
+        redis.set("State_is_autonomous", "true");
+        redis.set("State_destination_is_reach", "false");
+        redis.set("State_need_compute_global_path", "true");
+    }));
+
+    /* Ping pong from API. */
+    current_socket->on("ping", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        current_socket->emit("pong");
+    }));
+
+    //TODO: (new) part. /--------------------
+
+    current_socket->on("operator_order_command", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        //TODO: mettre au claire ça.
+        std::string new_order = data->get_string();
+
+        if(new_order.compare("STOP") == 0)
+        {
+            redis.set("State_order", data->get_string());
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
+            redis.set("State_is_autonomous", "false");
+        }
+        if(new_order.compare("HOME") == 0)
+        {
+            redis.set("State_position_to_reach", "544/750/");
+            redis.set("State_need_compute_global_path", "true");
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
+            redis.set("State_is_autonomous", "true");
+        }
+        if(new_order.compare("OPEN-MODULE") == 0)
+        {
+            redis.set("State_order", "OPEN");
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
+        }
+        if(new_order.compare("CLOSE-MODULE") == 0)
+        {
+            redis.set("State_order", "CLOSE");
+            redis.publish("command_micro", "1/0/7/0/7/0/7/0/7/0/7/0/7/");
+        }
+        
+    }));
+
+    current_socket->on("operator_order_controller", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        //! pass code in no autonomous mode.
+        redis.set("State_is_autonomous", "false");
+        nicolas_test_function(redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
+        // map_manual_command(&redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
+    }));
+
+    // Stream video
+    current_socket->on("stream_ON", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        stream_video = true;
+        redis.set("State_stream", "ON");
+    }));
+
+    current_socket->on("stream_OFF", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
+    {
+        stream_video = false;
+        redis.set("State_stream", "OFF");
+    }));
+}
 
 void function_thread_A()
 {
     // THREAD DESCRIPTION: send data to server and manage connection.
 
-    int frequency       = 20;
+    int frequency       = 5;
     double time_of_loop = 1000/frequency;                  // en milliseconde.
     std::chrono::high_resolution_clock::time_point last_loop_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point x              = std::chrono::high_resolution_clock::now();
@@ -34,38 +138,76 @@ void function_thread_A()
         std::this_thread::sleep_until(next);
         //
 
-        // state of robot.
-        recover_data_and_send_to_server(current_socket);
-
-        // map_checking validation.
-        if((*redis.get("State_map_validate")).compare("false") == 0)
-        {
-            check_the_good_map(&redis, current_socket);
-        }
-        else
-        {
-            if((*redis.get("State_map_available")).compare("false") == 0)
-            {
-                active_download_map(&redis);
-            }
-        }
-
-
+        send_robot_identifiant(&redis, h.socket(), "robot");
+        send_robot_status(&redis, h.socket(), "robot_data_operator");
     }
 }
 
+using namespace cv;
 
 void function_thread_C()
 {
-    // THREAD DESCRIPTION: download map and manage.
+    // THREAD VIDEO.
+
+    while(true)
+    {
+        //open the video file for reading
+        VideoCapture cap(4); 
+
+        String window_name = "Debug_screen_video";
+
+        int i = 0;
+
+        while (stream_video)
+        {
+            Mat frame; Mat Dest;
+            bool bSuccess = cap.read(frame); // read a new frame from video 
+            resize(frame, Dest, Size(0,0), 0.20, 0.20, 6);
+
+            //Breaking the while loop at the end of the video
+            if (bSuccess == false) 
+            {
+                std::cout << "Found the end of the video" << std::endl;
+                break;
+            }
+
+            // show the frame in the created window
+            // imshow(window_name, frame);
+
+            if( i == 0)
+            {
+                ImagemConverter i;
+                std::string msg_64 = i.mat2str(&Dest);
+                send_image_64base(h.socket(), msg_64);
+            }
+            i++;
+            if( i > 3) i = 0;
+
+            if (waitKey(10) == 27)
+            {
+                std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
+                break;
+            }
+
+            if(!stream_video)
+            {
+                break;
+            }
+        }
+    }
 }
 
 int main()
 {
-    // init program.
-    init_server_connection(&redis, current_socket);
+    // init connection server.
+    std::string adress_server;
+    get_param_data(&redis, &adress_server);
+    h.connect(adress_server);
+    bind_events(h.socket());
 
-    // run thread.
+    send_robot_identifiant(&redis, h.socket(), "robot");
+    send_robot_status(&redis, h.socket(), "robot_status_operator");
+
     thread_A = std::thread(&function_thread_A);
     thread_C = std::thread(&function_thread_C);
 

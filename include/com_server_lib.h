@@ -14,10 +14,13 @@
 
 void get_param_data(sw::redis::Redis* redis, std::string* adress);
 void init_server_connection(sw::redis::Redis* redis, sio::socket::ptr current_socket);
-void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::mutex* _lock);
-void recover_data_and_send_to_server(sio::socket::ptr current_socket);
+void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket);
 void check_the_good_map(sw::redis::Redis* redis, sio::socket::ptr current_socket);
 void active_download_map(sw::redis::Redis* redis);
+void map_manual_command(sw::redis::Redis* redis, double back_value, double front_value, double angle);
+void send_robot_identifiant(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::string topic_name);
+void send_robot_status(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::string topic_name);
+void send_image_64base(sio::socket::ptr current_socket, std::string base64_msg);
 
 #ifndef CONNECTION_LISTERNER_H
 #define CONNECTION_LISTERNER_H

@@ -74,7 +74,11 @@
         "source_location": "cpp",
         "rope": "cpp",
         "shared_mutex": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "csetjmp": "cpp",
+        "cuchar": "cpp",
+        "unordered_set": "cpp",
+        "scoped_allocator": "cpp"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }
