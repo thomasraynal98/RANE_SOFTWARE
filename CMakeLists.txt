@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -lredis++ -lhiredis 
 FIND_PACKAGE(OpenCV 4 REQUIRED)
 FIND_PACKAGE(ydlidar_sdk REQUIRED)
 FIND_PACKAGE(slamcore_sdk REQUIRED)
-FIND_PACKAGE(websocketpp REQUIRED)
+# FIND_PACKAGE(websocketpp REQUIRED)
 
 include_directories(
   ${YDLIDAR_SDK_INCLUDE_DIRS}
@@ -81,19 +81,19 @@ TARGET_LINK_LIBRARIES(prog_com_microcontroler
     serial)
 
 # PROGRAMME COMMUNICATION SERVER.
-ADD_EXECUTABLE(prog_com_server
-software/prog_com_server.cpp
-src/com_server_lib.cpp 
-include/com_server_lib.h
-src/ConvertImage.cpp
-include/ConvertImage.h)
+# ADD_EXECUTABLE(prog_com_server
+# software/prog_com_server.cpp
+# src/com_server_lib.cpp 
+# include/com_server_lib.h
+# src/ConvertImage.cpp
+# include/ConvertImage.h)
 
-TARGET_LINK_LIBRARIES(prog_com_server
-    redis++
-    pthread
-    hiredis
-    sioclient
-    ${OpenCV_LIBS})
+# TARGET_LINK_LIBRARIES(prog_com_server
+#     redis++
+#     pthread
+#     hiredis
+#     sioclient
+#     ${OpenCV_LIBS})
 
 # PROGRAMME VSLAM.
 ADD_EXECUTABLE(prog_vslam

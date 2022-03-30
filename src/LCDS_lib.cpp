@@ -635,11 +635,11 @@ void project_LW_onLCDS(Robot_complete_position* position_robot, std::vector<Lida
     // 7. Draw data on LCDS_compute.
     for(auto lidar_data : *LW_onLCDS)
     {
-        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)),18, cv::Scalar(200), cv::FILLED, 0,0);
+        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)),  LIDAR_TRY_AVOID, cv::Scalar(200), cv::FILLED, 0,0);
     }
     for(auto lidar_data : *LW_onLCDS)
     {
-        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)), 6,   cv::Scalar(0), cv::FILLED, 0,0);
+        cv::circle(*LCDS_color, cv::Point((int)(lidar_data.idx_col),(int)(lidar_data.idx_row)), LIDAR_PROHIBITED,   cv::Scalar(0), cv::FILLED, 0,0);
     }
 }
 
@@ -808,13 +808,16 @@ void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::
     Pixel_position origine_robot_centre((int)LCDS_compute->cols/2, (int)LCDS_compute->rows/2);
     double distance_max = -1;
 
+    //TODO: (NEW)
+    Pixel_position FPKP_memory(-1,-1);
+
     Pixel_position FPKP(-1,-1);
     Pixel_position reset_model(-1,-1);
 
     //! distance_up   : represente la distance max du FPKP.
     //! distance_down : represente la distance min du FPKP en dessous duquel pas de destination est detecter.
     double distance_up    = 20.0;
-    double distance_down  = 1.5;
+    double distance_down  = 1.0;
     
     if(unknow_option == 0)
     {
@@ -833,6 +836,9 @@ void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::
                     m_distance_btw = distance_btw_pixel(origine_robot_centre, PKP, 0.05);
                     if(m_distance_btw > distance_max && m_distance_btw < distance_up && m_distance_btw > distance_down) 
                     {
+                        //TODO: (NEW) store even if it's blocked.
+                        if(i == 0) FPKP_memory = PKP;
+
                         FPKP = PKP;
                         distance_max = m_distance_btw;
                     }
@@ -854,6 +860,40 @@ void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::
         }
     }
 
+    //TODO: (NEW) D'après certain bug le systeme est bloqué lorsque tout les PKP sont bloqué
+    //TODO: exemple : Rue Basse direction DVSU
+    //TODO: Dans ce cas bien précis on va utiliser la technique horizontale.
+    //! REMARQUE: il peux s'agir de la fin du parcours, il faudra verifier ensuite.
+    Pixel_position HAKP(-1,-1); // HALP : Horizontal Alternatif Key Point.
+    HAKP.idx_row = FPKP_memory.idx_row;
+
+    if(FPKP_memory.idx_col < origine_robot_centre.idx_col)
+    {
+        int idx_col_research = FPKP_memory.idx_col;
+        for(int i = 0; idx_col_research + i < (int)LCDS_compute->cols; i++)
+        {
+            HAKP.idx_col = idx_col_research + i;
+            if(PKP_is_available(LCDS_compute, &HAKP))
+            {
+                *Local_destination = HAKP;
+            }
+        }
+    }
+
+    if(FPKP_memory.idx_col > origine_robot_centre.idx_col)
+    {
+        int idx_col_research = FPKP_memory.idx_col;
+        for(int i = 0; idx_col_research - i >= 0; i++)
+        {
+            HAKP.idx_col = idx_col_research - i;
+            if(PKP_is_available(LCDS_compute, &HAKP))
+            {
+                *Local_destination = HAKP;
+            }
+        }
+    }
+
+    //TODO: (NEW) ligne du dessous commenter.
     *Local_destination = reset_model;
 }
 
@@ -956,6 +996,59 @@ void reset_Pixel_position_vector(std::vector<Pixel_position>& Local_trajectory)
     }
 }
 
+void destination_is_reach(std::vector<Pixel_position>* GPKP, Robot_complete_position* position_robot, double reach_treshold_m, sw::redis::Redis* redis, \
+std::vector<Pixel_position> &Local_trajectory)
+{
+    //TODO: Cette fonction intervient juste après que l'algorythme est tenté de creer 
+    //TODO: une trajectory vers une destination local.
+
+    Pixel_position px_destination(-1,-1);
+    for(int i = 0; i < GPKP->capacity(); i++) 
+    {
+        if(GPKP->at(i).idx_col == -1) {px_destination = GPKP->at(i-1); break;}
+    }
+    Pixel_position px_position     = position_robot->p_center;
+ 
+    double distance_to_destination = distance_btw_pixel(px_position, px_destination, 0.05);
+    redis->set("State_distance_destination", std::to_string(distance_to_destination));
+
+    //TODO: Compute local trajectory distance if available.
+    double local_trajectory_size   = 0;
+    for(int i = 1; i < Local_trajectory.capacity(); i++)
+    {
+        if(Local_trajectory[i].idx_col == -1) break;
+        local_trajectory_size      += distance_btw_pixel(Local_trajectory[i-1],Local_trajectory[i], 0.05);
+    }
+
+    //! Security reach destination.
+    if(distance_to_destination < reach_treshold_m)
+    {
+        // Si la local trajectory est plus grande de 40% par rapport au vol d'oiseau.
+        if(distance_to_destination * 1.6 < local_trajectory_size)
+        {
+            redis->set("Error_debug", "STOP_40%_BIGGER");
+            redis->set("State_destination_is_reach", "true");
+            redis->set("State_robot", "WAITING");
+        }
+
+        // Si aucune trajectory n'a était creer.
+        if(local_trajectory_size == 0)
+        {
+            redis->set("Error_debug", "NO_TRAJECTORY_NEXT_TO_END");
+            redis->set("State_destination_is_reach", "true");
+            redis->set("State_robot", "WAITING");
+        }
+    }
+
+    //! Real reach destination.
+    if(distance_to_destination < 1.5)
+    {
+        redis->set("Error_debug", "NO_ERROR_PERFECT_STOP");
+        redis->set("State_destination_is_reach", "true");
+        redis->set("State_robot", "WAITING");
+    }
+}
+
 //TODO: FUNCTION DE DEBUGAGE.
 
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows)
@@ -1051,7 +1144,7 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
             //! MODE COMPUTE.
             if(true)
             {
-                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),18, cv::Scalar(60,80,100), cv::FILLED, 0,0);
+                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),LIDAR_TRY_AVOID, cv::Scalar(60,80,100), cv::FILLED, 0,0);
             }
         }
         //! MODE COMPUTE.
@@ -1059,7 +1152,7 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
         {
             if(true)
             {
-                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),6, cv::Scalar(60/2,80/2,100/2), cv::FILLED, 0,0);
+                cv::circle(LCDS_color_clone, cv::Point((int)(P_lidar_data.idx_col),(int)(P_lidar_data.idx_row)),LIDAR_PROHIBITED, cv::Scalar(60/2,80/2,100/2), cv::FILLED, 0,0);
             }
         }
     }

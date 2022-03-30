@@ -326,7 +326,7 @@ bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src)
     */
 
     // basic approach.
-    double search_distance = 5.0; // meters.
+    double search_distance = 3.0; // meters.
     int search_box = (int)(search_distance*20.0); // 20 cases by 1m.
     double closest_point_distance = 9999;
 
@@ -334,10 +334,11 @@ bool found_new_src(cv::Mat grid, const Pair& point, Pair* new_src)
     {
         for(int j = -search_box; j < search_box; j++)
         {
-            if(i >= 0 && i < grid.size[1] && j >= 0 && j < grid.size[0])
+            if(point.first+i >= 0 && point.first+i < grid.cols && \
+              point.second+j >= 0 && point.second+j < grid.rows)
             {
-                if((int)grid.at<uchar>(point.second+j, point.first+i) == 200 || \
-                (int)grid.at<uchar>(point.second+j, point.first+i) == 255)
+                if((int)grid.at<uchar>(cv::Point(point.first+i, point.second+j)) == 200 || \
+                (int)grid.at<uchar>(cv::Point(point.first+i, point.second+j)) == 255)
                 {
                     if(sqrt(pow(j,2)+pow(i,2))*0.05 < closest_point_distance)
                     {

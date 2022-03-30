@@ -173,13 +173,16 @@ void function_thread_LCDS()
 
             debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP);
 
+            // Reach destination checking.
+            destination_is_reach(&GPKP, &position_robot, 3.0, &redis, Local_trajectory);
+            
             // Compute motor commande.
 
-            //! check if we reach the target.
         }
         else
         {
-            //! add an 20 ms sleep code.
+            //! add an 100 ms sleep code.
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 }

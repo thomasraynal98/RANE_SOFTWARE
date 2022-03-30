@@ -1,3 +1,7 @@
+#define LIDAR_TRY_AVOID 14 
+// 14 - 6 = 8 x 5 cm = 40 cm de l'obstacles.
+#define LIDAR_PROHIBITED 6
+
 #ifndef LCDS_LIB_H
 #define LCDS_LIB_H
 
@@ -190,6 +194,7 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
 void reset_Pixel_position_vector(std::vector<Pixel_position>& Local_trajectory);
 void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option);
 bool is_the_same(Pixel_position* px_A, Pixel_position* px_B);
+void destination_is_reach(std::vector<Pixel_position>* GPKP, Robot_complete_position* position_robot, double reach_treshold_m, sw::redis::Redis* redis, std::vector<Pixel_position> &Local_trajectory);
 
 //TODO: DEBUG FONCTION.
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows);
