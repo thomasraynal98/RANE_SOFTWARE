@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <ConvertImage.h>
 
 using namespace sw::redis;
 
@@ -100,8 +101,8 @@ void bind_events(sio::socket::ptr current_socket)
     {
         //! pass code in no autonomous mode.
         redis.set("State_is_autonomous", "false");
-        nicolas_test_function(redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
-        // map_manual_command(&redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
+        // nicolas_test_function(redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
+        map_manual_command(&redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
     }));
 
     // Stream video
@@ -143,8 +144,6 @@ void function_thread_A()
     }
 }
 
-using namespace cv;
-
 void function_thread_C()
 {
     // THREAD VIDEO.
@@ -152,17 +151,17 @@ void function_thread_C()
     while(true)
     {
         //open the video file for reading
-        VideoCapture cap(4); 
+        cv::VideoCapture cap(4); 
 
-        String window_name = "Debug_screen_video";
+        std::string window_name = "Debug_screen_video";
 
         int i = 0;
 
         while (stream_video)
         {
-            Mat frame; Mat Dest;
+            cv::Mat frame; cv::Mat Dest;
             bool bSuccess = cap.read(frame); // read a new frame from video 
-            resize(frame, Dest, Size(0,0), 0.20, 0.20, 6);
+            cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
 
             //Breaking the while loop at the end of the video
             if (bSuccess == false) 
@@ -172,7 +171,7 @@ void function_thread_C()
             }
 
             // show the frame in the created window
-            // imshow(window_name, frame);
+            imshow(window_name, frame);
 
             if( i == 0)
             {
@@ -183,7 +182,7 @@ void function_thread_C()
             i++;
             if( i > 3) i = 0;
 
-            if (waitKey(10) == 27)
+            if (cv::waitKey(10) == 27)
             {
                 std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
                 break;
@@ -194,6 +193,7 @@ void function_thread_C()
                 break;
             }
         }
+        cap.release();
     }
 }
 

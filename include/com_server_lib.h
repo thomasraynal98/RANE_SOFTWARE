@@ -11,6 +11,11 @@
 #include <list>
 #include <cstdlib>
 #include <sw/redis++/redis++.h>
+#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 void get_param_data(sw::redis::Redis* redis, std::string* adress);
 void init_server_connection(sw::redis::Redis* redis, sio::socket::ptr current_socket);
