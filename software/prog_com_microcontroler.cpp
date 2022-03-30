@@ -50,14 +50,18 @@ void function_thread_A()
         next                       += std::chrono::milliseconds((int)time_of_loop);
         std::this_thread::sleep_until(next);
         //
-        if(connection != NULL)
+        
+        try
         {
-            send_ping_micro(connection, &ping_time);
-        }
-        else
-        {
-            connection = found_micro_port(1,true);
-        }
+            if(connection != NULL)
+            {
+                send_ping_micro(connection, &ping_time);
+            }
+            else
+            {
+                connection = found_micro_port(1,true);
+            }
+        } catch(...) {}
     }
 }
 
@@ -84,48 +88,51 @@ void function_thread_C()
 
     while(true)
     {
-        if(connection != NULL && connection->IsOpen())
+        try
         {
-            connection->ReadLine(reponse, stop);
-            if(reponse.size() > 0)
+            if(connection != NULL && connection->IsOpen())
             {
-                if(reponse[0] == '0')
+                connection->ReadLine(reponse, stop);
+                if(reponse.size() > 0)
                 {
-                    // pong reception.
-                    pong_time = std::chrono::high_resolution_clock::now();
-                }
-                if(reponse[0] == '1')
-                {
-                    // pong motor reception.
-                    if((last_command_motor).compare(reponse) == 0)
+                    if(reponse[0] == '0')
                     {
-                        last_command_motor_micro = reponse;
+                        // pong reception.
+                        pong_time = std::chrono::high_resolution_clock::now();
+                    }
+                    if(reponse[0] == '1')
+                    {
+                        // pong motor reception.
+                        if((last_command_motor).compare(reponse) == 0)
+                        {
+                            last_command_motor_micro = reponse;
+                        }
+                    }
+                    if(reponse[0] == '2')
+                    {
+                        // encoder data reception.
+                        publish_raw_data_encoder(&redis, reponse);
                     }
                 }
-                if(reponse[0] == '2')
-                {
-                    // encoder data reception.
-                    publish_raw_data_encoder(&redis, reponse);
-                }
-            }
 
-            // check pong last reception.
-            now  = std::chrono::high_resolution_clock::now();
-            time_span = now - pong_time;
-            if((int)time_span.count() > 700)
-            {
-                // we don't receive ping/pong.
-                // connection->Close();
-                // connection = NULL;
+                // check pong last reception.
+                now  = std::chrono::high_resolution_clock::now();
+                time_span = now - pong_time;
+                if((int)time_span.count() > 700)
+                {
+                    // we don't receive ping/pong.
+                    // connection->Close();
+                    // connection = NULL;
+                }
+                
             }
-            
-        }
-        else
-        {
-            next = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(500);
-            std::this_thread::sleep_until(next);
-            pong_time = std::chrono::high_resolution_clock::now();
-        }
+            else
+            {
+                next = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(500);
+                std::this_thread::sleep_until(next);
+                pong_time = std::chrono::high_resolution_clock::now();
+            }
+        } catch(...) {}
     }
 }
 
@@ -152,7 +159,8 @@ void function_thread_D()
 
         if(last_command_motor_micro.compare(last_command_motor) != 0 && connection != NULL)
         {
-            send_command_micro(connection, last_command_motor);
+            try{ send_command_micro(connection, last_command_motor);}
+            catch(...) {}
         }
     }
 }

@@ -4,76 +4,12 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include "global_path_lib.h"
 
 void get_param_data(sw::redis::Redis* redis, std::string* adress)
 {
     *adress = *(redis->get("Param_server_adress"));
 }
-
-// void bind_events(sw::redis::Redis* redis, sio::socket::ptr current_socket)
-// {
-//     /*
-//         DESCRIPTION: this function store all kind of message that we can receive 
-//             from the main API.
-//     */
-
-//     /* If our current map is the good one. */
-//     current_socket->on("good", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         redis->set("State_map_validate", "true");
-//     }));
-
-//     /* If our current map is not the good one, we need to get a new one. */
-//     current_socket->on("download", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         redis->set("Param_localisation", std::to_string(data->get_map()["id"]->get_int()));
-//         redis->set("Param_id_current_map", data->get_map()["localisation"]->get_string());
-//         redis->set("Param_link_current_map_session", data->get_map()["link_session"]->get_string());
-//         redis->set("Param_link_current_map_png", data->get_map()["link_png"]->get_string());
-//         redis->set("State_map_available", "false");
-//         redis->set("State_map_validate", "true");
-//     }));
-
-//     /* In manual mode we need that robot do a precise command. */
-//     current_socket->on("command_to_do", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         redis->set("State_is_autonomous", "false");
-//         redis->publish("command_micro", data->get_string());
-//     }));
-
-//     /* In autonav mode we need that robot reach a new point. */
-//     current_socket->on("position_to_reach", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         std::string msg_destination = std::to_string(data->get_map()["i"]->get_int()) + "/" + std::to_string(data->get_map()["j"]->get_int()) + "/";
-//         redis->set("State_position_to_reach", msg_destination);
-//         redis->set("State_is_autonomous", "true");
-//         redis->set("State_destination_is_reach", "false");
-//         redis->set("State_need_compute_global_path", "true");
-//     }));
-
-//     /* Ping pong from API. */
-//     current_socket->on("ping", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         current_socket->emit("pong");
-//     }));
-
-//     //TODO: (new) part. /--------------------
-
-//     current_socket->on("operator_order_command", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         //TODO: mettre au claire ça.
-//         redis->set("State_order", data->get_string());
-//     }));
-
-//     current_socket->on("operator_order_controller", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-//     {
-//         //! pass code in no autonomous mode.
-//         std::cout << "YOOOOO" << std::endl;
-//         // redis->set("State_is_autonomous", "false");
-//         std::cout << "YOOOOO" << std::endl;
-//         // map_manual_command(redis, data->get_vector()[1]->get_double(), data->get_vector()[2]->get_double(), data->get_vector()[3]->get_double());
-//     }));
-// }
 
 void send_robot_status(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::string topic_name)
 {
@@ -83,8 +19,12 @@ void send_robot_status(sw::redis::Redis* redis, sio::socket::ptr current_socket,
     std::string name_robot = *(redis->get("Param_modele")) + "_" + *(redis->get("Param_exploitation"));
     data_robot->get_map()["name"]       = sio::string_message::create(name_robot);
 
+
     double longitude = 2.236340;
     double latitude  = 48.896460;
+
+    transform_in_world_ref(&longitude, &latitude);
+
     data_robot->get_map()["latitude"]   = sio::double_message::create(latitude);
     data_robot->get_map()["longitude"]  = sio::double_message::create(longitude);
 
@@ -284,4 +224,54 @@ void send_image_64base(sio::socket::ptr current_socket, std::string base64_msg)
 {
     base64_msg = "data:image/jpg;base64, " + base64_msg;
     current_socket->emit("stream_video", base64_msg);
+}
+
+void transform_in_world_ref(sw::redis::Redis* redis, double * longitude, double * latitude)
+{
+    // DESCRITION: Cette fonction va recuperer la position x, y, yaw et va la transformer 
+    // en position latitude et longitude.
+
+    // PARAM CALCUL.
+    Pair pt_glob_1(2.4, 49.8);
+    Pair pt_glob_2(2.54, 49.81);
+
+    double p_dx = pt_glob_1.first;
+    double p_dy = pt_glob_1.second;
+
+    Pair pt_map_1(0.0, 0.0);
+    Pair pt_map_2(12.5,14.0);
+
+    double distance_vecteur_map = sqrt(pow(pt_map_2.first,2)+pow(pt_map_2.second,2));
+    double distance_vecteur_global = sqrt(pow(pt_glob_1.first-pt_glob_2.first,2)+pow(pt_glob_1.second-pt_glob_2.second,2));
+    double p_scale = distance_vecteur_global / distance_vecteur_map;
+
+    double p_angle_transfo = atan2(pt_map_2.second-pt_map_1.second, pt_map_2.first-pt_map_1.first) - atan2(pt_glob_2.second-pt_glob_1.second, pt_glob_2.first-pt_glob_1.first);
+    if(p_angle_transfo < 0) {p_angle_transfo += 2 * M_PI;} // [0,2PI]
+    // END PARAM.
+
+    // START COMPUTE.
+    double x, y, yaw;
+    std::string T;
+    redis_output_position_string = *(redis->get("State_robot_position_center"));
+    std::stringstream X3(redis_output_position_string);
+    i = 0;
+    while(std::getline(X3, T, '/'))
+    {
+        if(i == 0) 
+        {
+            x = std::stod(T);
+        }
+        if(i == 1) 
+        {
+            y = std::stod(T);
+        }
+        i += 1;
+    }
+    
+    double distance = sqrt(pow(x,2)+pow(y,2));
+    double bonus    = M_PI_4;
+    double angle    = p_angle_transfo + bonus;
+
+    *longitude = p_dx + (x * cos(angle) - y * sin(angle)) * p_scale;
+    *latitude  = p_dy + (x * sin(angle) + y * cos(angle)) * p_scale;
 }

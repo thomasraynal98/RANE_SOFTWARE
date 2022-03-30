@@ -108,14 +108,17 @@ void bind_events(sio::socket::ptr current_socket)
     // Stream video
     current_socket->on("stream_ON", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
     {
-        stream_video = true;
-        redis.set("State_stream", "ON");
-    }));
-
-    current_socket->on("stream_OFF", sio::socket::event_listener_aux([&](std::string const& name, sio::message::ptr const& data, bool isAck, sio::message::list &ack_resp)
-    {
-        stream_video = false;
-        redis.set("State_stream", "OFF");
+        std::cout << "NEW_MESSAGE=" << data->get_string() << std::endl;
+        if(data->get_string().compare("TRUE") == 0)
+        {
+            stream_video = true;
+            redis.set("State_stream", "ON");
+        }
+        if(data->get_string().compare("FALSE") == 0)
+        {
+            stream_video = false;
+            redis.set("State_stream", "OFF");
+        }
     }));
 }
 
@@ -151,49 +154,51 @@ void function_thread_C()
     while(true)
     {
         //open the video file for reading
-        cv::VideoCapture cap(4); 
-
-        std::string window_name = "Debug_screen_video";
-
-        int i = 0;
-
+    
         while (stream_video)
         {
-            cv::Mat frame; cv::Mat Dest;
-            bool bSuccess = cap.read(frame); // read a new frame from video 
-            cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
+            cv::VideoCapture cap(4); 
 
-            //Breaking the while loop at the end of the video
-            if (bSuccess == false) 
+            std::string window_name = "Debug_screen_video";
+
+            int i = 0;
+
+            while(stream_video)
             {
-                std::cout << "Found the end of the video" << std::endl;
-                break;
-            }
+                cv::Mat frame; cv::Mat Dest;
+                bool bSuccess = cap.read(frame); // read a new frame from video 
+                cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
 
-            // show the frame in the created window
-            imshow(window_name, frame);
+                //Breaking the while loop at the end of the video
+                if (bSuccess == false) 
+                {
+                    std::cout << "Found the end of the video" << std::endl;
+                    break;
+                }
 
-            if( i == 0)
-            {
-                ImagemConverter i;
-                std::string msg_64 = i.mat2str(&Dest);
-                send_image_64base(h.socket(), msg_64);
-            }
-            i++;
-            if( i > 3) i = 0;
+                // show the frame in the created window
+                imshow(window_name, frame);
 
-            if (cv::waitKey(10) == 27)
-            {
-                std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
-                break;
-            }
+                if( i == 0)
+                {
+                    ImagemConverter i;
+                    std::string msg_64 = i.mat2str(&Dest);
+                    send_image_64base(h.socket(), msg_64);
+                }
+                i++;
+                if( i > 3) i = 0;
 
-            if(!stream_video)
-            {
-                break;
+                if (cv::waitKey(10) == 27)
+                {
+                    std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
+                    break;
+                }
             }
+            cap.release();
         }
-        cap.release();
+
+        // Sleep to avoid infinity loop.
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
 

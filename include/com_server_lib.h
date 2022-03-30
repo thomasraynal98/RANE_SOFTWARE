@@ -26,6 +26,7 @@ void map_manual_command(sw::redis::Redis* redis, double back_value, double front
 void send_robot_identifiant(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::string topic_name);
 void send_robot_status(sw::redis::Redis* redis, sio::socket::ptr current_socket, std::string topic_name);
 void send_image_64base(sio::socket::ptr current_socket, std::string base64_msg);
+void transform_in_world_ref(sw::redis::Redis* redis, double* longitude, double* latitude);
 
 #ifndef CONNECTION_LISTERNER_H
 #define CONNECTION_LISTERNER_H
