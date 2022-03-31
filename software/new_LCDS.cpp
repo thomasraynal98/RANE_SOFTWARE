@@ -171,17 +171,18 @@ void function_thread_LCDS()
             // Create trajectory.
             create_trajectory(&redis, &Local_destination, &LCDS_compute_clone, Local_trajectory, &position_robot, &ILKP);
 
-            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP);
-
             // Reach destination checking.
             destination_is_reach(&GPKP, &position_robot, 3.0, &redis, Local_trajectory);
             
             // Compute motor commande.
+            motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param);
 
+            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP, &redis);
         }
         else
         {
             //! add an 100 ms sleep code.
+            publish_basic_motor_control(&redis, 2);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }

@@ -54,6 +54,7 @@ int start(sw::redis::Redis* redis)
     redis->set("State_base_identifiant", "RANE_MK3_KODA_1");
 
     redis->set("Error_debug", "NO_ERROR");
+    redis->set("Info_debug", "NO_INFO");
 }
 
 int main()
@@ -122,6 +123,7 @@ int main()
         std::cout << "State_base_identifiant=" << *redis.get("State_base_identifiant") << std::endl;
 
         std::cout << "\nError_debug=" << *redis.get("Error_debug") << std::endl;
+        std::cout << "Info_debug=" << *redis.get("Info_debug") << std::endl;
     }
 
     return 0;

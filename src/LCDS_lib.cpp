@@ -1,6 +1,7 @@
 #include <LCDS_lib.h>
 #include <global_path_lib.h>
 #include <bits/stdc++.h> 
+#include <utility>
 
 void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample)
 {
@@ -956,7 +957,7 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
             if(size_trajectory >= size_trajectory_max)
             {
                 //! We select the 80% index of this path.
-                int index_selection_ILKP = (int)(size_trajectory*0.5);
+                int index_selection_ILKP = (int)(size_trajectory*0.75);
                 
                 // setup new ILKP.
                 Pixel_position reset_model(-1,-1);
@@ -1049,6 +1050,238 @@ std::vector<Pixel_position> &Local_trajectory)
     }
 }
 
+void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param)
+{
+    //TODO: Cette function va prendre la local trajectory et la transformer en commande moteur.
+
+    if(option.compare("MODEL_ADVANCE") == 0)
+    {
+        // Get X TKP.
+        int nb_TKP = 4;
+        std::vector<std::pair<double, double>> TKP_vector;
+
+        //! CLASSIC ROTATION DETECTION.
+        //TODO: Check if the FKP is in front or behind.
+        
+        if(Local_destination->idx_row > (int)LCDS_compute->rows/2)
+        {
+            if(Local_destination->idx_col <= (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 0);
+            if(Local_destination->idx_col >  (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 1);
+        }
+
+        //! NO CLASSIC ROTATION.
+        if(Local_destination->idx_row <= (int)LCDS_compute->rows/2)
+        {
+            // Get size in pixel local trajectory.
+            int count_size = 0;
+            for(int i = 0; i < Local_trajectory.capacity(); i++) if(Local_trajectory[i].idx_col == -1) {count_size = i - 1; break;}
+            if(count_size < 0) count_size = 0;
+
+            // Fill TKP_vector.
+            for(int i = 5; i < count_size; i += 5)
+            {
+                Pair TKP(Local_trajectory[i].idx_col, Local_trajectory[i].idx_row);
+                TKP_vector.push_back(TKP);
+                if(i > nb_TKP*5) break;
+            }
+
+            if(TKP_vector.size() > 0) 
+            {
+                std::pair<double, double> bezierVector = beziertarget(TKP_vector);
+
+                //TODO: REMOVE
+                std::string msg_debug = std::to_string(bezierVector.first) + "/" + std::to_string(bezierVector.second) + "/";
+                redis->set("Info_debug", msg_debug);
+
+                Pair robot_pt((int)LCDS_compute->cols/2, (int)LCDS_compute->rows/2);
+
+                double alpha = get_alpha(robot_pt, -M_PI_2, bezierVector);
+                double R     = 15; //Rmax en m
+                double V     = navigation_param->V; // Vmax en m.s-1S
+                if(alpha != 0){
+                    R = V/alpha;
+                }
+
+                //! COMPUTE MESSAGE CONTROL.
+                // std::string msg;
+
+                double xk = 0; // difference on x btw center of robot and center of rotation.
+                double e  = 0.23; // distance btw wheel en m.
+                double l  = 0.53 / 2; // 
+
+                std::vector<double> x{e,0,-e,e,0,-e};
+                std::vector<double> y{-l,-l,-l,l,l,l};
+                
+                // for(int i = 0; i < 6; i++)
+                // {
+                //     int side = -1;
+                //     if(R < 0) side = 1;
+
+                //     // R = abs(R);
+
+                //     double speed_wheel = (V/(R-y[i]*side))*sqrt(pow(R-y[i]*side,2)+pow(x[i]-xk,2));
+                //     int side2=-1;
+                //     if(speed_wheel < 0) 
+                //     {
+                //         side2 = 1;
+                //         speed_wheel = abs(speed_wheel);
+                //     }
+                //     msg += std::to_string(side2) + "/" + std::to_string(speed_wheel) + "/";
+                // }
+
+                //! THOMAS
+                std::string msg = "1/";
+                for(int i = 0; i < 6; i++)
+                {
+                    double speed_wheel = 0;
+                    int moteur_direction = 1;
+                    if(R > 0) // R situé a droite du robot
+                    {
+                        if(abs(R) > l)
+                        {
+                            // 3 moteurs dans le meme side.
+
+                        }
+                        else
+                        {
+                            // 3 moteurs dans le sens inverse.
+                            if(i > 2) moteur_direction = -1;
+                        }
+                        if(R == 0) R = 0.0001;
+                        // R = abs(R);
+                        speed_wheel = abs((V/(R))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
+                    }
+                    if(R <= 0) // R situé a gauche du robot
+                    {
+                        if(abs(R) > l)
+                        {
+                            // 3 moteurs dans le meme side.
+                        }
+                        else
+                        {
+                            // 3 moteurs dans le sens inverse.
+                            if(i < 3) moteur_direction = -1;
+                        }
+                        if(R == 0) R = 0.0001;
+                        // R = abs(R);
+                        speed_wheel = abs((V/(R))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
+                    }
+                    msg += std::to_string(moteur_direction) + "/" + std::to_string(speed_wheel) + "/";
+                }
+
+                //TODO: debug variable.
+                // std::string msg_debug = "R:" + std::to_string(R); 
+                // msg_debug += " V:" + std::to_string(V); 
+                // msg_debug += " alpha:" + std::to_string(alpha); 
+                // redis->set("Info_debug", msg_debug);
+
+                redis->publish("command_micro", msg);
+            }
+            else
+            {
+                publish_basic_motor_control(redis, 2);
+            }
+        }
+    }
+
+    if(option.compare("MODEL_CLASSIC_OLD") == 0)
+    {
+        if(Local_destination->idx_col != -1 && Local_destination->idx_row != -1)
+        {
+            //! CLASSIC ROTATION DETECTION.
+            if(Local_destination->idx_row > (int)LCDS_compute->rows/2)
+            {
+                if(Local_destination->idx_col <= (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 0);
+                if(Local_destination->idx_col >  (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 1);
+            }
+
+            //! NO CLASSIC ROTATION.
+            if(Local_destination->idx_row <= (int)LCDS_compute->rows/2)
+            {
+                // Get size in pixel local trajectory.
+                int count_size = 0;
+                for(int i = 0; i < Local_trajectory.capacity(); i++) if(Local_trajectory[i].idx_col == -1) {count_size = i - 1; break;}
+                if(count_size < 0) count_size = 0;
+
+                // Get Local destination.
+                int local_col = -1; int local_row = -1;
+                if(count_size > 8) {local_col = Local_trajectory[8].idx_col; local_row = Local_trajectory[8].idx_row;}
+                else {local_col = Local_trajectory[count_size-1].idx_col; local_row = Local_trajectory[count_size-1].idx_row;}
+
+                // compute target angle.
+                int index_i = local_col  - LCDS_compute->cols;
+                int index_j = LCDS_compute->rows - local_row;
+                double angle_TKP = 9999;
+                if(index_i != 0) { angle_TKP = atan2((double)(index_j),(double)(index_i));} //in rad (-PI to PI)
+                else
+                {
+                    index_i = 0.01;
+                    angle_TKP = atan2((double)(index_j),(double)(index_i));
+                }
+                double angle_R_TKP = angle_TKP - M_PI_2;
+
+                const double V        = navigation_param->V;// desired velocity, u can make V depend on distance to target to slow down when close
+                const double K        = navigation_param->K;// turning gain [0.5:1]
+                double F              = navigation_param->F; // influence of straight line component
+                const int back_angle  = navigation_param->back_angle; // angle to consider that we are moving backwards in rad
+                const int stall_pwm   = navigation_param->stall_pwm;
+                const int unstall_pwm = navigation_param->unstall_pwm;
+
+                double rightspeed = (double)(V*(F*cos(angle_R_TKP)+K*sin(angle_R_TKP)));
+                double leftspeed  = (double)(V*(F*cos(angle_R_TKP)-K*sin(angle_R_TKP)));
+
+                // send to robot  
+                std::string msg_command = "1/";
+                int direction;
+                if(leftspeed>0) {direction = 1;}
+                else {direction = -1;}
+                for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(leftspeed)) + "/";}
+                if(rightspeed>0) {direction = 1;}
+                else {direction = -1;}
+                for(int i = 0; i < 3; i++) { msg_command += std::to_string(direction) + "/" + std::to_string(abs(rightspeed)) + "/";}
+
+                redis->publish("command_micro", msg_command);
+            }
+        }
+        else
+        {
+            publish_basic_motor_control(redis, 2);
+        }
+    }
+}
+
+void publish_basic_motor_control(sw::redis::Redis* redis, int option)
+{
+    //? LEFT ROTATION
+    if(option == 0) redis->publish("command_micro", "1/-1/0.15/-1/0.15/-1/0.15/1/0.15/1/0.15/1/0.15/");
+    //? RIGHT ROTATION
+    if(option == 1) redis->publish("command_micro", "1/1/0.15/1/0.15/1/0.15/-1/0.15/-1/0.15/-1/0.15/");
+    //? STOP ROTATION
+    if(option == 2) redis->publish("command_micro", "1/0/7.00/0/7.00/0/7.00/0/7.00/0/7.0000/0/7.000/");
+}
+
+//TODO: MOTOR COMMANDE FUNCTION.
+
+std::pair<double, double> beziertarget(std::vector<std::pair<double, double>> points){
+    // calcul le point de bezier quadratic
+    double total=0;
+    std::pair<double, double> target;
+    for(int i=0;i<points.size();i++){
+        total+=pow(points.size()-i,2);
+        target.first+=pow(points.size()-i,2)*points.at(i).first;
+        target.second+=pow(points.size()-i,2)*points.at(i).second;
+    }
+    target.first/=total;
+    target.second/=total;
+    return target;
+}
+
+double get_alpha(std::pair<double,double> robot,double robotangle, std::pair<double,double> target){
+    // retourne l angle vers la difference d angle entre le robot et le prochain point
+    return std::atan2(target.second - robot.second, target.first-robot.first) - robotangle; // [-pi-angle robot: pi-angle robot]
+}
+
+
 //TODO: FUNCTION DE DEBUGAGE.
 
 void debug_data(std::vector<Lidar_data>* new_lidar_sample, std::vector<Lidar_sample>* lidarWindows)
@@ -1111,7 +1344,7 @@ void debug2_data(std::vector<Pixel_position>* GPKP, std::vector<bool>* GPKP_notY
     }
 }
 
-void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS, std::vector<Lidar_sample>* lidarWindows, Robot_complete_position* position_robot, Pixel_position* Local_destination, std::vector<Pixel_position>* Local_trajectory, Intermediate_LCDS_KP* ILKP)
+void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, std::vector<Pixel_position>* GPKP_onLCDS, std::vector<Lidar_sample>* lidarWindows, Robot_complete_position* position_robot, Pixel_position* Local_destination, std::vector<Pixel_position>* Local_trajectory, Intermediate_LCDS_KP* ILKP, sw::redis::Redis* redis)
 {
     //TODO: Cette fonction va permettre de visualiser si les données obtenu sont correcte.
 
@@ -1204,6 +1437,33 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
                 }
             }
         }
+    }
+
+    // Ajouter le bezier Point.
+    if(true)
+    {   
+        try{
+        Pixel_position bezier_px(-1,-1);
+
+        std::string redis_output_position_string = *(redis->get("Info_debug"));
+
+        std::string T;
+        std::stringstream X(redis_output_position_string);
+        int i = 0;
+        while(std::getline(X, T, '/'))
+        {
+            if(i == 0) 
+            {
+                bezier_px.idx_col   = std::stoi(T);
+            }
+            if(i == 1)
+            {
+                bezier_px.idx_row   = std::stoi(T);
+            }
+            i += 1;
+        }
+        cv::circle(LCDS_color_clone, cv::Point((int)(bezier_px.idx_col),(int)(bezier_px.idx_row)),1, cv::Scalar(0,0,255), cv::FILLED, 0,0);
+        } catch(...) {}
     }
 
     // Visualiser le resultat.
