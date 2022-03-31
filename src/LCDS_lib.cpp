@@ -1099,7 +1099,7 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
                 double R     = 15; //Rmax en m
                 double V     = navigation_param->V; // Vmax en m.s-1S
                 if(alpha != 0){
-                    R = V/alpha;
+                    R = (V/alpha) * 0.05;
                 }
 
                 //! COMPUTE MESSAGE CONTROL.
@@ -1149,7 +1149,7 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
                         }
                         if(R == 0) R = 0.0001;
                         // R = abs(R);
-                        speed_wheel = abs((V/(R))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
+                        // speed_wheel = abs((V/(R-x[i]))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
                     }
                     if(R <= 0) // R situé a gauche du robot
                     {
@@ -1164,8 +1164,9 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
                         }
                         if(R == 0) R = 0.0001;
                         // R = abs(R);
-                        speed_wheel = abs((V/(R))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
+                        // speed_wheel = abs((V/(R-x[i]))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
                     }
+                    speed_wheel = (sqrt(pow(R-y[i],2)+pow(x[i],2))*V)/sqrt(pow(R,2)+pow(V,2));
                     msg += std::to_string(moteur_direction) + "/" + std::to_string(speed_wheel) + "/";
                 }
 
