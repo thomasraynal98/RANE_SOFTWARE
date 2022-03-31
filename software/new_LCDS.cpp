@@ -139,8 +139,13 @@ void function_thread_LCDS()
     Local_trajectory.reserve((int)(p_LCDS_width*1.5));
     setup_new_GPKP(&Local_trajectory); //! name of this function is not pertinant but function is.
 
+    //TODO: Transform to redis_variable
     int64 t0 = cv::getTickCount();
     int64 t1 = cv::getTickCount();
+
+    //TODO REMOVE & TEST
+    int stop_command_counter = 0;
+    
     while(true)
     {
         if(is_new_position_detected(&position_robot, &redis) && \
@@ -149,7 +154,7 @@ void function_thread_LCDS()
         (*(redis.get("State_is_autonomous"))).compare("true") == 0 && \
         (*(redis.get("State_slamcore"))).compare("OK") == 0)
         {   
-            
+            //TODO: Transform to redis_variable
             t0 = cv::getTickCount();
             double secs = (t0-t1)/cv::getTickFrequency();
             std::cout << "time for loops : " << secs << " Hz: " << 1/secs << std::endl;
@@ -175,7 +180,7 @@ void function_thread_LCDS()
             destination_is_reach(&GPKP, &position_robot, 3.0, &redis, Local_trajectory);
             
             // Compute motor commande.
-            motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param);
+            motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param, &stop_command_counter);
 
             debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP, &redis);
         }

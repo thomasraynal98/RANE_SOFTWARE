@@ -195,7 +195,7 @@ void reset_Pixel_position_vector(std::vector<Pixel_position>& Local_trajectory);
 void select_FPKP(Pixel_position* Local_destination, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS, int unknow_option);
 bool is_the_same(Pixel_position* px_A, Pixel_position* px_B);
 void destination_is_reach(std::vector<Pixel_position>* GPKP, Robot_complete_position* position_robot, double reach_treshold_m, sw::redis::Redis* redis, std::vector<Pixel_position> &Local_trajectory);
-void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param);
+void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param, int* stop_command_counter);
 void publish_basic_motor_control(sw::redis::Redis* redis, int option);
 double get_alpha(std::pair<double,double> robot,double robotangle, std::pair<double,double> target);
 std::pair<double, double> beziertarget(std::vector<std::pair<double, double>> points);

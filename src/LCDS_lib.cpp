@@ -722,6 +722,10 @@ void project_ILKP_onLCDS(cv::Mat* LCDS_color, Robot_complete_position* position_
 void select_local_destination(Pixel_position* Local_destination, Intermediate_LCDS_KP* ILKP, Robot_complete_position* position_robot, cv::Mat* LCDS_compute, std::vector<Pixel_position>* GPKP_onLCDS)
 {
     //TODO: Cette function va selectionner la local destination de cette époque du LCDS.
+
+    //TODO : REMOVE OR TEST
+    Pixel_position reset_model(-1,-1);
+    *Local_destination = reset_model;
     
     // 1. Check if they are a ILKP init.
     if(ILKP->distance != -1)
@@ -952,13 +956,13 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
             Pixel_position LCDS_opencv_origine(0,0);
             Pixel_position LCDS_robot_origine((int)(LCDS_compute->cols/2), (int)(LCDS_compute->rows/2));
 
-            //! size max est égale à 70% d'une demi diagonal.
+            //! size max est égale à 10% d'une demi diagonal.
             int size_trajectory_max = (int)(distance_btw_pixel(LCDS_opencv_origine, LCDS_robot_origine,1) * 0.1);
 
             if(size_trajectory >= size_trajectory_max)
             {
-                //! We select the 80% index of this path.
-                int index_selection_ILKP = (int)(size_trajectory*0.75);
+                //! We select the 65% index of this path.
+                int index_selection_ILKP = (int)(size_trajectory*0.65);
                 
                 // setup new ILKP.
                 Pixel_position reset_model(-1,-1);
@@ -979,6 +983,8 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
     }
     if(!trajectory_found)
     {
+        Pixel_position reset_model(-1,-1);
+        *Local_destination = reset_model;
         return;
     }
 }
@@ -1005,7 +1011,7 @@ std::vector<Pixel_position> &Local_trajectory)
     //TODO: une trajectory vers une destination local.
 
     Pixel_position px_destination(-1,-1);
-    for(int i = 0; i < GPKP->capacity(); i++) 
+    for(int i = 1; i < GPKP->capacity(); i++) 
     {
         if(GPKP->at(i).idx_col == -1) {px_destination = GPKP->at(i-1); break;}
     }
@@ -1051,7 +1057,8 @@ std::vector<Pixel_position> &Local_trajectory)
     }
 }
 
-void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param)
+void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param, \
+int* stop_command_counter)
 {
     //TODO: Cette function va prendre la local trajectory et la transformer en commande moteur.
 
@@ -1079,18 +1086,21 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
             if(count_size < 0) count_size = 0;
 
             // Fill TKP_vector.
-            for(int i = 5; i < count_size; i += 5)
+            if(count_size > 0)
             {
-                Pair TKP(Local_trajectory[i].idx_col, Local_trajectory[i].idx_row);
-                TKP_vector.push_back(TKP);
-                if(i > nb_TKP*5) break;
+                for(int i = 5; i < count_size; i += 5)
+                {
+                    Pair TKP(Local_trajectory[i].idx_col, Local_trajectory[i].idx_row);
+                    TKP_vector.push_back(TKP);
+                    if(i > nb_TKP*5) break;
+                }
             }
 
             if(TKP_vector.size() > 0) 
             {
                 std::pair<double, double> bezierVector = beziertarget(TKP_vector);
 
-                //TODO: REMOVE
+                //TODO: REMOVE (BUT IT'S FOR PRINT ON DEBUG)
                 std::string msg_debug = std::to_string(bezierVector.first) + "/" + std::to_string(bezierVector.second) + "/";
                 redis->set("Info_debug", msg_debug);
 
@@ -1104,7 +1114,6 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
                 }
 
                 //! COMPUTE MESSAGE CONTROL.
-                // std::string msg;
 
                 double xk = 0; // difference on x btw center of robot and center of rotation.
                 double e  = 0.23; // distance btw wheel en m.
@@ -1112,23 +1121,6 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
 
                 std::vector<double> x{e,0,-e,e,0,-e};
                 std::vector<double> y{-l,-l,-l,l,l,l};
-                
-                // for(int i = 0; i < 6; i++)
-                // {
-                //     int side = -1;
-                //     if(R < 0) side = 1;
-
-                //     // R = abs(R);
-
-                //     double speed_wheel = (V/(R-y[i]*side))*sqrt(pow(R-y[i]*side,2)+pow(x[i]-xk,2));
-                //     int side2=-1;
-                //     if(speed_wheel < 0) 
-                //     {
-                //         side2 = 1;
-                //         speed_wheel = abs(speed_wheel);
-                //     }
-                //     msg += std::to_string(side2) + "/" + std::to_string(speed_wheel) + "/";
-                // }
 
                 //! THOMAS
                 std::string msg = "1/";
@@ -1171,17 +1163,17 @@ void motor_control(std::string option, std::vector<Pixel_position> &Local_trajec
                     msg += std::to_string(moteur_direction) + "/" + std::to_string(speed_wheel) + "/";
                 }
 
-                //TODO: debug variable.
-                // std::string msg_debug = "R:" + std::to_string(R); 
-                // msg_debug += " V:" + std::to_string(V); 
-                // msg_debug += " alpha:" + std::to_string(alpha); 
-                // redis->set("Info_debug", msg_debug);
-
                 redis->publish("command_micro", msg);
             }
             else
             {
-                publish_basic_motor_control(redis, 2);
+                // TODO : REMOVE & TEST
+                *stop_command_counter++;
+                if(*stop_command_counter > 3)
+                {
+                    *stop_command_counter = 0;
+                    publish_basic_motor_control(redis, 2);
+                }
             }
         }
     }
@@ -1477,10 +1469,12 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
         char d=(char)cv::waitKey(25);
     }
 
-    // Send to redis.
+    //TODO : REMOVE AFTER
+    // Send to redis for publish in WEB INTERFACE.
     if(true)
     {
-        redis->set("State_module_identifiant", i.mat2str(&Dest));
+        ImagemConverter i;
+        redis->set("State_module_identifiant", i.mat2str(&LCDS_color_clone));
     }
 }
 

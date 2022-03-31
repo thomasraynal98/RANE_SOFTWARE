@@ -186,7 +186,8 @@ void function_thread_C()
                     // send_image_64base(h.socket(), msg_64);
 
                     // TODO: REMOVE DEBUG.
-                    send_image_64base(h.socket(), redis.set("State_module_identifiant"););
+                    send_image_64base(h.socket(), *(redis.get("State_module_identifiant")));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
                 i++;
                 if( i > 3) i = 0;
