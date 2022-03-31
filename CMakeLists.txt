@@ -181,7 +181,9 @@ software/new_LCDS.cpp
 src/LCDS_lib.cpp 
 include/LCDS_lib.h
 src/global_path_lib.cpp 
-include/global_path_lib.h)
+include/global_path_lib.h
+src/ConvertImage.cpp
+include/ConvertImage.h)
 
 TARGET_LINK_LIBRARIES(LocalCDS
     redis++

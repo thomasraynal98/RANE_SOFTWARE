@@ -2,6 +2,7 @@
 #include <global_path_lib.h>
 #include <bits/stdc++.h> 
 #include <utility>
+#include <ConvertImage.h>
 
 void setup_new_lidar_sample(std::vector<Lidar_data>* new_lidar_sample)
 {
@@ -1468,12 +1469,18 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
     }
 
     // Visualiser le resultat.
-    if(true)
+    if(false)
     {
         cv::namedWindow("Debug_LCDS",cv::WINDOW_AUTOSIZE);
         cv::resize(LCDS_color_clone, LCDS_color_clone, cv::Size(0,0),5.0,5.0,6);
         cv::imshow("Debug_LCDS", LCDS_color_clone);
         char d=(char)cv::waitKey(25);
+    }
+
+    // Send to redis.
+    if(true)
+    {
+        redis->set("State_module_identifiant", i.mat2str(&Dest));
     }
 }
 

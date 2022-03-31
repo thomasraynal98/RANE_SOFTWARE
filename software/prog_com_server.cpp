@@ -183,7 +183,10 @@ void function_thread_C()
                 {
                     ImagemConverter i;
                     std::string msg_64 = i.mat2str(&Dest);
-                    send_image_64base(h.socket(), msg_64);
+                    // send_image_64base(h.socket(), msg_64);
+
+                    // TODO: REMOVE DEBUG.
+                    send_image_64base(h.socket(), redis.set("State_module_identifiant"););
                 }
                 i++;
                 if( i > 3) i = 0;
