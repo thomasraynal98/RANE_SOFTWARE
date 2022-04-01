@@ -1163,6 +1163,7 @@ int* stop_command_counter)
                     msg += std::to_string(moteur_direction) + "/" + std::to_string(speed_wheel) + "/";
                 }
 
+                *stop_command_counter = 0;
                 redis->publish("command_micro", msg);
             }
             else
