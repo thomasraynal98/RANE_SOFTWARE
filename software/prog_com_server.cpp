@@ -157,32 +157,33 @@ void function_thread_C()
     
         while (stream_video)
         {
-            cv::VideoCapture cap(4); 
+            // cv::VideoCapture cap(4); 
 
-            std::string window_name = "Debug_screen_video";
+            // std::string window_name = "Debug_screen_video";
 
             int i = 0;
 
             while(stream_video)
             {
-                cv::Mat frame; cv::Mat Dest;
-                bool bSuccess = cap.read(frame); // read a new frame from video 
-                cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
+                // cv::Mat frame; cv::Mat Dest;
+                // bool bSuccess = cap.read(frame); // read a new frame from video 
+                // cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
 
-                //Breaking the while loop at the end of the video
-                if (bSuccess == false) 
-                {
-                    std::cout << "Found the end of the video" << std::endl;
-                    break;
-                }
+                // //Breaking the while loop at the end of the video
+                // if (bSuccess == false) 
+                // {
+                //     std::cout << "Found the end of the video" << std::endl;
+                //     break;
+                // }
 
-                // show the frame in the created window
-                imshow(window_name, frame);
+                // // show the frame in the created window
+                // imshow(window_name, frame);
+                std::cout << std::endl;
 
                 if( i == 0)
                 {
                     ImagemConverter i;
-                    std::string msg_64 = i.mat2str(&Dest);
+                    // std::string msg_64 = i.mat2str(&Dest);
                     // send_image_64base(h.socket(), msg_64);
 
                     // TODO: REMOVE DEBUG.
@@ -198,7 +199,7 @@ void function_thread_C()
                     break;
                 }
             }
-            cap.release();
+            // cap.release();
         }
 
         // Sleep to avoid infinity loop.

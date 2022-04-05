@@ -23,7 +23,7 @@ using namespace sw::redis;
 
 //! VARIABLE PARAM.
 double max_m_dist = 200;
-int lidarWindows_size = 20;
+int lidarWindows_size = 30;
 double LCDS_resolution = 0.05;
 double m_LCDS_width    = 8.0;
 double m_LCDS_height   = 3.0;
@@ -97,7 +97,7 @@ void function_thread_redisData()
            redis_input_str.length() > 2 && \
            redis_input_str.compare("no_path") != 0)
         {
-            ILKP_reset(&ILKP);
+            // ILKP_reset(&ILKP);
             get_new_GPKP(&GPKP, redis_input_str);
             GPKP_string = redis_input_str;
         }
@@ -157,7 +157,7 @@ void function_thread_LCDS()
             //TODO: Transform to redis_variable
             t0 = cv::getTickCount();
             double secs = (t0-t1)/cv::getTickFrequency();
-            std::cout << "time for loops : " << secs << " Hz: " << 1/secs << std::endl;
+            // std::cout << "time for loops : " << secs << " Hz: " << 1/secs << std::endl;
             t1 = cv::getTickCount();
 
             // Filter the GPKP and show only unreach KP.
@@ -180,14 +180,15 @@ void function_thread_LCDS()
             destination_is_reach(&GPKP, &position_robot, 3.0, &redis, Local_trajectory);
             
             // Compute motor commande.
-            motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param, &stop_command_counter);
+            motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param, stop_command_counter);
 
             debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP, &redis);
         }
         else
         {
             //! add an 100 ms sleep code.
-            publish_basic_motor_control(&redis, 2);
+            if((*(redis.get("State_slamcore"))).compare("OK") != 0 || (*(redis.get("State_destination_is_reach"))).compare("false") != 0) 
+            { publish_basic_motor_control(&redis, 2); }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }

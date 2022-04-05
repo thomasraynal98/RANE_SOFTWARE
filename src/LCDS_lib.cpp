@@ -167,6 +167,7 @@ void add_lidar_sample_to_lidarWindows(int lidar_count, std::vector<Lidar_sample>
     // 3. Filtrage param.
     // ! filter_windows egale le nombre de case devant et derrière.
     int filter_windows = 10;
+    if(filter_windows >= lidarWindows->size()) filter_windows = lidarWindows->size() -1;
     double filter_x = 0; double filter_y = 0; double filter_yaw_deg = 0;
     int idx_filtered = lidar_count - filter_windows;
 
@@ -740,7 +741,7 @@ void select_local_destination(Pixel_position* Local_destination, Intermediate_LC
         }
 
         // Check reach.
-        if(ILKP->distance != -1 && ILKP_is_reach(LCDS_compute, ILKP, 1.0))
+        if(ILKP->distance != -1 && ILKP_is_reach(LCDS_compute, ILKP, 1.5))
         {
             ILKP_reset(ILKP);
         }
@@ -983,8 +984,9 @@ void create_trajectory(sw::redis::Redis* redis, Pixel_position* Local_destinatio
     }
     if(!trajectory_found)
     {
-        Pixel_position reset_model(-1,-1);
-        *Local_destination = reset_model;
+        //! KEEP the local destination information, command_motor need it to simple rotation.
+        // Pixel_position reset_model(-1,-1);
+        // *Local_destination = reset_model;
         return;
     }
 }
@@ -1058,7 +1060,7 @@ std::vector<Pixel_position> &Local_trajectory)
 }
 
 void motor_control(std::string option, std::vector<Pixel_position> &Local_trajectory, Pixel_position* Local_destination, cv::Mat* LCDS_compute, sw::redis::Redis* redis, Robot_complete_position* position_robot, Param_nav* navigation_param, \
-int* stop_command_counter)
+int& stop_command_counter)
 {
     //TODO: Cette function va prendre la local trajectory et la transformer en commande moteur.
 
@@ -1075,6 +1077,7 @@ int* stop_command_counter)
         {
             if(Local_destination->idx_col <= (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 0);
             if(Local_destination->idx_col >  (int)LCDS_compute->cols/2) publish_basic_motor_control(redis, 1);
+            return;
         }
 
         //! NO CLASSIC ROTATION.
@@ -1098,6 +1101,8 @@ int* stop_command_counter)
 
             if(TKP_vector.size() > 0) 
             {
+                stop_command_counter = 0;
+                std::cout << "NEW COMMANDE" << std::endl;
                 std::pair<double, double> bezierVector = beziertarget(TKP_vector);
 
                 //TODO: REMOVE (BUT IT'S FOR PRINT ON DEBUG)
@@ -1113,11 +1118,24 @@ int* stop_command_counter)
                     R = (V/alpha) * 0.05;
                 }
 
+                //TODO : REMOVE
+                if(alpha > M_PI ) 
+                {
+                    publish_basic_motor_control(redis, 0);
+                    return;
+                }
+                if(alpha < -M_PI ) 
+                {
+                    publish_basic_motor_control(redis, 1);
+                    return;
+                }
+
+
                 //! COMPUTE MESSAGE CONTROL.
 
                 double xk = 0; // difference on x btw center of robot and center of rotation.
                 double e  = 0.23; // distance btw wheel en m.
-                double l  = 0.53 / 2; // 
+                double l  = 0.53 / 8 ; // 2
 
                 std::vector<double> x{e,0,-e,e,0,-e};
                 std::vector<double> y{-l,-l,-l,l,l,l};
@@ -1159,21 +1177,23 @@ int* stop_command_counter)
                         // R = abs(R);
                         // speed_wheel = abs((V/(R-x[i]))*sqrt(pow(R-y[i],2)+pow(x[i],2)));
                     }
-                    speed_wheel = (sqrt(pow(R-y[i],2)+pow(x[i],2))*V)/sqrt(pow(R,2)+pow(V,2));
+                    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    // speed_wheel = (sqrt(pow(R-y[i],2)+pow(x[i],2))*V)/sqrt(pow(R,2)+pow(V,2));
+                    speed_wheel = (sqrt(pow(R-y[i]*2,2)+pow(x[i]*1.1,2))*V)/sqrt(pow(R,2)+pow(V,2));
                     msg += std::to_string(moteur_direction) + "/" + std::to_string(speed_wheel) + "/";
                 }
 
-                *stop_command_counter = 0;
                 redis->publish("command_micro", msg);
             }
             else
             {
                 // TODO : REMOVE & TEST
-                *stop_command_counter++;
-                if(*stop_command_counter > 3)
+                stop_command_counter++;
+                if(stop_command_counter > 10)
                 {
-                    *stop_command_counter = 0;
-                    publish_basic_motor_control(redis, 2);
+                    std::cout << ">>> MECCCCCCCCC >>> " << stop_command_counter << std::endl;
+                    stop_command_counter = 0;
+                    // publish_basic_motor_control(redis, 2);
                 }
             }
         }
@@ -1248,9 +1268,9 @@ int* stop_command_counter)
 void publish_basic_motor_control(sw::redis::Redis* redis, int option)
 {
     //? LEFT ROTATION
-    if(option == 0) redis->publish("command_micro", "1/-1/0.15/-1/0.15/-1/0.15/1/0.15/1/0.15/1/0.15/");
+    if(option == 0) redis->publish("command_micro", "1/-1/0.30/-1/0.15/-1/0.30/1/0.30/1/0.15/1/0.30/");
     //? RIGHT ROTATION
-    if(option == 1) redis->publish("command_micro", "1/1/0.15/1/0.15/1/0.15/-1/0.15/-1/0.15/-1/0.15/");
+    if(option == 1) redis->publish("command_micro", "1/1/0.30/1/0.15/1/0.30/-1/0.30/-1/0.30/-1/0.30/");
     //? STOP ROTATION
     if(option == 2) redis->publish("command_micro", "1/0/7.00/0/7.00/0/7.00/0/7.00/0/7.0000/0/7.000/");
 }

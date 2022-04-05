@@ -23,7 +23,7 @@ void send_robot_status(sw::redis::Redis* redis, sio::socket::ptr current_socket,
     double longitude = 2.236340;
     double latitude  = 48.896460;
 
-    transform_in_world_ref(&longitude, &latitude);
+    // transform_in_world_ref(&longitude, &latitude);
 
     data_robot->get_map()["latitude"]   = sio::double_message::create(latitude);
     data_robot->get_map()["longitude"]  = sio::double_message::create(longitude);
@@ -252,9 +252,9 @@ void transform_in_world_ref(sw::redis::Redis* redis, double * longitude, double 
     // START COMPUTE.
     double x, y, yaw;
     std::string T;
-    redis_output_position_string = *(redis->get("State_robot_position_center"));
+    std::string redis_output_position_string = *(redis->get("State_robot_position_center"));
     std::stringstream X3(redis_output_position_string);
-    i = 0;
+    int i = 0;
     while(std::getline(X3, T, '/'))
     {
         if(i == 0) 
