@@ -113,11 +113,14 @@ void bind_events(sio::socket::ptr current_socket)
         {
             stream_video = true;
             redis.set("State_stream", "ON");
+            redis.set("State_stream_LCDS", "ON");
         }
         if(data->get_string().compare("FALSE") == 0)
         {
             stream_video = false;
-            redis.set("State_stream", "OFF");
+            //! DEBUG NORMAL IS OFF.
+            redis.set("State_stream", "ON");
+            redis.set("State_stream_LCDS", "ON");
         }
     }));
 }
@@ -155,43 +158,43 @@ void function_thread_C()
     {
         //open the video file for reading
     
-        while (stream_video)
+        while (true)
         {
-            // cv::VideoCapture cap(4); 
+            cv::VideoCapture cap(4); 
 
             // std::string window_name = "Debug_screen_video";
 
-            int i = 0;
+            // int i = 0;
 
-            while(stream_video)
+            while(true)
             {
-                // cv::Mat frame; cv::Mat Dest;
-                // bool bSuccess = cap.read(frame); // read a new frame from video 
-                // cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
+                cv::Mat frame; cv::Mat Dest;
+                bool bSuccess = cap.read(frame); // read a new frame from video 
+                cv::resize(frame, Dest, cv::Size(0,0), 0.20, 0.20, 6);
 
-                // //Breaking the while loop at the end of the video
-                // if (bSuccess == false) 
-                // {
-                //     std::cout << "Found the end of the video" << std::endl;
-                //     break;
-                // }
-
-                // // show the frame in the created window
-                // imshow(window_name, frame);
-                std::cout << std::endl;
-
-                if( i == 0)
+                //Breaking the while loop at the end of the video
+                if (bSuccess == false) 
                 {
-                    ImagemConverter i;
-                    // std::string msg_64 = i.mat2str(&Dest);
-                    // send_image_64base(h.socket(), msg_64);
-
-                    // TODO: REMOVE DEBUG.
-                    send_image_64base(h.socket(), *(redis.get("State_module_identifiant")));
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    std::cout << "Found the end of the video" << std::endl;
+                    break;
                 }
-                i++;
-                if( i > 3) i = 0;
+
+                // show the frame in the created window
+                // imshow(window_name, frame);
+
+                // TO AVOID SEND EVERY TIME DATA.
+                // if( i == 0)
+                // {
+                    ImagemConverter ii;
+                    std::string msg_64 = ii.mat2str(&Dest);
+                    send_image_64base(h.socket(), msg_64);
+
+                    // TODO: SEND LIDAR DATA
+                    send_image_64base_LCDS(h.socket(), *(redis.get("State_LCDS_data_debug")));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                // }
+                // i++;
+                // if( i > 4) i = 0;
 
                 if (cv::waitKey(10) == 27)
                 {
@@ -199,10 +202,11 @@ void function_thread_C()
                     break;
                 }
             }
-            // cap.release();
+            cap.release();
         }
 
         // Sleep to avoid infinity loop.
+        std::cout << "stream_video=FALSE" << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }

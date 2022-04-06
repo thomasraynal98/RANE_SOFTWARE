@@ -1492,10 +1492,10 @@ void debug_alpha(cv::Mat* LCDS_color, std::vector<Pixel_position>* LW_onLCDS, st
 
     //TODO : REMOVE AFTER
     // Send to redis for publish in WEB INTERFACE.
-    if(true)
+    if((*(redis->get("State_stream_LCDS"))).compare("ON") == 0)
     {
         ImagemConverter i;
-        redis->set("State_module_identifiant", i.mat2str(&LCDS_color_clone));
+        redis->set("State_LCDS_data_debug", i.mat2str(&LCDS_color_clone));
     }
 }
 

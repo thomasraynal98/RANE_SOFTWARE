@@ -26,13 +26,15 @@ slamcore::PoseInterface<slamcore::camera_clock>::CPtr pose;
 std::shared_ptr<slamcore::MobileRobotSubsystemInterface> robot_feed; 
 std::shared_ptr<slamcore::HeightMappingSubsystemInterface> heightMappingSubSystem;
 slamcore::IDT sample_counter = 0;
-std::thread thread_A, thread_B;
+std::thread thread_A, thread_B, thread_C;
 bool slam_is_running = false;
+
+double grad = 0.0; double dx = 0.0; double dy = 0.0;
 
 void callback_command(std::string channel, std::string msg)
 {
     // new encoder input.
-    feed_encoder_data(msg, robot_feed, &sample_counter);
+    if(slam_is_running) feed_encoder_data(msg, robot_feed, &sample_counter, &grad, &dx, &dy);
 }
 
 void function_thread_A()
@@ -75,11 +77,13 @@ void function_thread_A()
             // Create/Connect SLAM System
             // ******************************************************************
             slamcore::v0::SystemConfiguration sysCfg;
-            sysCfg.EnableWheelOdometry = false; /// @note Remember to enable this option! 
-            // sysCfg.ConfigFilePath = ""; /// @note Please pass the path your wheel odometry calibration
-                                        /// file here!
-            // sysCfg.Source = slamcore::DataSource::RealSense;
-            // sysCfg.GenerateMap = false;
+            sysCfg.EnableWheelOdometry = true; /// @note Remember to enable this option! 
+            sysCfg.ConfigFilePath = "../data_software/parameter/vik_odometry_config.json"; /// @note Please pass the path your wheel odometry calibration
+            
+            /// file here!
+            sysCfg.Source = slamcore::DataSource::RealSense;
+            sysCfg.GenerateMap = true;
+            
             sysCfg.LoadSessionFilePath = ("../data_software/map/" + *(redis.get("Param_localisation")) + "_" + *(redis.get("Param_id_current_map")) + ".session").c_str();
 
             std::unique_ptr<slamcore::SLAMSystemCallbackInterface> slam = slamcore::createSLAMSystem(sysCfg);
@@ -107,21 +111,19 @@ void function_thread_A()
             // ******************************************************************
             // Create the MobileRobot subsystem
             // ******************************************************************
-            // if(!slam->getProperty<bool>(slamcore::Property::FeatureKinematicsEnabled))
-            // {
-            //     std::cerr << "This system doesn't support wheel odometry data!" << std::endl;
-            //     slamcore::slamcoreDeinit();
-            //     return -1;
-            // }
+            if(!slam->getProperty<bool>(slamcore::Property::FeatureKinematicsEnabled))
+            {
+                std::cerr << "This system doesn't support wheel odometry data!" << std::endl;
+                slamcore::slamcoreDeinit();
+            }
 
-            // if(!slam->isSubsystemSupported(slamcore::SubsystemType::MobileRobot))
-            // {
-            //     std::cerr << "This system doesn't support wheel odometry data!" << std::endl;
-            //     slamcore::slamcoreDeinit();
-            //     return -1;
-            // }
+            if(!slam->isSubsystemSupported(slamcore::SubsystemType::MobileRobot))
+            {
+                std::cerr << "This system doesn't support wheel odometry data!" << std::endl;
+                slamcore::slamcoreDeinit();
+            }
 
-            // robot_feed = slam->getSubsystem<slamcore::MobileRobotSubsystemInterface>();
+            robot_feed = slam->getSubsystem<slamcore::MobileRobotSubsystemInterface>();
 
             // *****************************************************************
             // Register callbacks!
@@ -179,6 +181,10 @@ void function_thread_A()
             slam_sys = std::move(slam);
             slam_is_running = true;
         }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     }
 }
 
@@ -192,7 +198,6 @@ void function_thread_B()
         {
 
             slam_sys->start();
-
             while(slam_sys->spinOnce())
             {
                 heightMappingSubSystem->fetch();
@@ -210,6 +215,14 @@ void function_thread_B()
     }
 }
 
+void function_thread_C(sw::redis::Subscriber* sub)
+{
+    while(true)
+    {
+        sub->consume();
+    }
+}
+
 int main()
 {
     redis.set("State_slamcore", "NOT_INITIALISED");
@@ -220,7 +233,9 @@ int main()
     // run thread.
     thread_A = std::thread(&function_thread_A);
     thread_B = std::thread(&function_thread_B);
+    thread_C = std::thread(&function_thread_C, &sub);
 
     thread_A.join();
     thread_B.join();
+    thread_C.join();
 }

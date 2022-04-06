@@ -116,35 +116,58 @@ double modulo(double a, double b) {
     return r;
 }
 
-void feed_encoder_data(std::string msg, std::shared_ptr<slamcore::MobileRobotSubsystemInterface> robot_feed, slamcore::IDT* sample_counter)
+void feed_encoder_data(std::string msg, std::shared_ptr<slamcore::MobileRobotSubsystemInterface> robot_feed, slamcore::IDT* sample_counter, double* grad, double* dx, double* dy)
 {
     // parse msg string to 3 double value.
+
+    //! On va garder la convention suivante, la valeur que j'envoie doit etre de l'odométrie réel.
+    //! C'est à dire qu'il va envoyer l'estimation de la position et non juste le delta Translation ou Rotation.
     
     // random number generator for the sake of the example
-    std::uniform_real_distribution<double> dist_m(-10.0,10.0);
-    std::uniform_real_distribution<double> dist_angle(-M_PI,M_PI);
-    std::default_random_engine re;
+    // std::uniform_real_distribution<double> dist_m(-10.0,10.0);
+    // std::uniform_real_distribution<double> dist_angle(-M_PI,M_PI);
+    // std::default_random_engine re;
 
-    std::shared_ptr<slamcore::WheelOdometrySample>
-    sample(new slamcore::WheelOdometrySample());
+    //! Get string value.
+    std::string T;
+    std::stringstream X(msg);
+    int i = 0;
+    std::vector<double> value_vec;
+    while(std::getline(X, T, '/'))
+    {
+        // std::cout << T << std::endl;
+        if(i > 0 && i < 7) { value_vec.push_back(std::stod(T));}
+        i++;
+    }
+
+    //! BAD STUFF
+    double wheel_perimetre  = 2.0 * M_PI * 10.0;
+
+    double tic_per_rotation = 1796.0;
+    double entraxe_en_tic   = tic_per_rotation * 54.0 / wheel_perimetre;
+    double tic_per_meter    = tic_per_rotation * 100.0 / wheel_perimetre;
+
+    double delta = (value_vec[0] + value_vec[1] + value_vec[2] + value_vec[3] + value_vec[4] + value_vec[5]) / 6;
+    double delta_rot = (((value_vec[3] + value_vec[4] + value_vec[5])/3) - ((value_vec[0] + value_vec[1] + value_vec[2])/3))/2;
+    
+    *grad += delta_rot / entraxe_en_tic;
+    *dx += cos(*grad) * delta / tic_per_meter;
+    *dy += sin(*grad) * delta / tic_per_meter;
+
+    std::cout << "grad=" << *grad << " dx=" << *dx << " dy=" << *dy << std::endl;
+
+    std::shared_ptr<slamcore::WheelOdometrySample> sample(new slamcore::WheelOdometrySample());
 
     // translation
-    const slamcore::Vector translation(dist_m(re), 0.0, 0.0); // X, Y, 0. // Y = 0.0 car le robot ne va pas sur la droite ou la gauche.
-    // peut etre que Y != 0 car si le robot tourne plus vite d'un coté que l'autre ok.
-
-    // rotation
-    const double theta = dist_angle(re); // rotation around the Z axis
-
-    // convert to quaternion
-    const double cz = std::cos(theta * 0.5);
-    const double sz = std::sin(theta * 0.5);
+    slamcore::Vector translation(*dx, *dy, 0.0); // X, Y, 0.
+    const double cz = std::cos(*grad * 0.5);
+    const double sz = std::sin(*grad * 0.5);
     slamcore::Vector rotation(0.0, 0.0, sz, cz); // X, Y, Z, W
 
     // fill the measurement
     sample->setValue(translation, rotation);
-
     // fill the metadata
-    sample->setID(*sample_counter++);
+    sample->setID((*sample_counter)++);
     sample->setSourceAcquisitionTimestamp(std::chrono::system_clock::now());
     // when this sample was captured
 

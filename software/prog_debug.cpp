@@ -45,6 +45,7 @@ int start(sw::redis::Redis* redis)
     redis->set("State_map_validate", "true");
     redis->set("State_map_available", "true");
     redis->set("State_stream", "OFF");
+    redis->set("State_stream_LCDS", "OFF");
     redis->set("State_distance_destination", "-1");
 
     redis->set("State_order", "NO_ORDER");
@@ -114,7 +115,8 @@ int main()
         std::cout << "State_map_validate=" << *redis.get("State_map_validate") << std::endl;
         std::cout << "State_map_available=" << *redis.get("State_map_available") << std::endl;
         std::cout << "State_distance_destination=" << *redis.get("State_distance_destination") << std::endl;
-        std::cout << "State_stream=" << *redis.get("State_stream") << std::endl << std::endl;
+        std::cout << "State_stream=" << *redis.get("State_stream") << std::endl;
+        std::cout << "State_stream_LCDS=" << *redis.get("State_stream_LCDS") << std::endl << std::endl;
 
         std::cout << "State_order=" << *redis.get("State_order") << std::endl;
         std::cout << "State_connection_base=" << *redis.get("State_connection_base") << std::endl;

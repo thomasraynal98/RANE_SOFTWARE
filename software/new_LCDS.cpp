@@ -182,7 +182,10 @@ void function_thread_LCDS()
             // Compute motor commande.
             motor_control("MODEL_ADVANCE", Local_trajectory, &Local_destination, &LCDS_compute_clone, &redis, &position_robot, &navigation_param, stop_command_counter);
 
-            debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP, &redis);
+            if((*(redis.get("State_stream_LCDS"))).compare("ON") == 0)
+            {
+                debug_alpha(&LCDS_color, &LW_onLCDS, &GPKP_onLCDS, &lidarWindows, &position_robot, &Local_destination, &Local_trajectory, &ILKP, &redis);
+            }
         }
         else
         {

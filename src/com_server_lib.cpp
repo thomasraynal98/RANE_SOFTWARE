@@ -226,6 +226,12 @@ void send_image_64base(sio::socket::ptr current_socket, std::string base64_msg)
     current_socket->emit("stream_video", base64_msg);
 }
 
+void send_image_64base_LCDS(sio::socket::ptr current_socket, std::string base64_msg)
+{
+    base64_msg = "data:image/jpg;base64, " + base64_msg;
+    current_socket->emit("stream_lidar", base64_msg);
+}
+
 void transform_in_world_ref(sw::redis::Redis* redis, double * longitude, double * latitude)
 {
     // DESCRITION: Cette fonction va recuperer la position x, y, yaw et va la transformer 
